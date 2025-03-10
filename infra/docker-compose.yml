@@ -1,35 +1,35 @@
 version: '3.9'
 
 services:
-  ldap:
-    image: osixia/openldap:latest
-    container_name: ldap
-    environment:
-      LDAP_ORGANISATION: "lambdabytes"
-      LDAP_DOMAIN: "example.com"
-      LDAP_ADMIN_PASSWORD: "admin"
-    ports:
-      - "389:389"
-      - "636:636"
-    volumes:
-      - ldap_data:/var/lib/ldap
-      - ldap_config:/etc/ldap/slapd.d
+  # ldap:
+  #   image: osixia/openldap:latest
+  #   container_name: ldap
+  #   environment:
+  #     LDAP_ORGANISATION: "lambdabytes"
+  #     LDAP_DOMAIN: "example.com"
+  #     LDAP_ADMIN_PASSWORD: "admin"
+  #   ports:
+  #     - "389:389"
+  #     - "636:636"
+  #   volumes:
+  #     - ldap_data:/var/lib/ldap
+  #     - ldap_config:/etc/ldap/slapd.d
 
-  wso2is:
-    image: wso2/wso2is:latest
-    container_name: wso2is
-    ports:
-      - "9443:9443"
+  # wso2is:
+  #   image: wso2/wso2is:latest
+  #   container_name: wso2is
+  #   ports:
+  #     - "9443:9443"
 
-  phpldapadmin:
-    image: osixia/phpldapadmin
-    container_name: phpldapadmin
-    environment:
-      PHPLDAPADMIN_LDAP_HOSTS: "ldap"
-      PHPLDAPADMIN_HTTPS: "false"
-      PHPLDAPADMIN_TRUST_PROXY_SSL: "true"
-    ports:
-      - "8081:80"
+  # phpldapadmin:
+  #   image: osixia/phpldapadmin
+  #   container_name: phpldapadmin
+  #   environment:
+  #     PHPLDAPADMIN_LDAP_HOSTS: "ldap"
+  #     PHPLDAPADMIN_HTTPS: "false"
+  #     PHPLDAPADMIN_TRUST_PROXY_SSL: "true"
+  #   ports:
+  #     - "8081:80"
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
