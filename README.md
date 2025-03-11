@@ -10,15 +10,15 @@ This repo contains stuff collected while traying to get hands-on experience with
     - Create 2 new Users U1 and U2 in the new Realm.
         - Assign RO1 and RO2 to U1
         - Assign R02 to U2
-2. create script for automatically configuring Idp via REST (is this actually possible?)
-    - new realm
-    - new testuser 
-    - new testuser roles
-3. set up a small REST service in Rust with 2-3 REST endpoints.
-4. Implement "Authorization Code Flow" https://www.keycloak.org/docs/latest/server_admin/index.html#_oidc-auth-flows-authorization
+    - export/import realm config
+2. set up a small BFF REST service in Rust with 2 REST endpoints. This service acts as BFF for a potential UI. The BFF holds the tokens and forwards them to the Backend REST service for authorization. We are not sending the identity token back to the Backendservice. Also: the BFF does not expose the tokens to the UI, but need to find out how we implement the flow then.
+    - Implement a "Login" to fetch the bearer token that is gonna be stored in the BFF
+3. set up a small Backend REST service in Rust with 2 REST endpoints that receives the token from the BFF and unpacks it and uses an inspection endpoint with the Idp to check if the token is valid.
+4. implement a 3rd Rust application that mimicks the Frontend via HTTP REST calls. Also implement refresh tokens
+3. Implement "Authorization Code Flow" https://www.keycloak.org/docs/latest/server_admin/index.html#_oidc-auth-flows-authorization
     - Server Side Client using Rust
     - https://www.oauth.com/oauth2-servers/token-introspection-endpoint/
-5. explore SSO
+4. explore SSO
 
 ## TODO Identity Provider / IAM / LDAP / AD integration: after Idp <-> REST Server interaction and SSO works 
 - set up identity provider (some that does not require some cloud application: LinkedIn or FB)

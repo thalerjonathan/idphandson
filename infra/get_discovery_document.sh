@@ -1,0 +1,1 @@
+curl -X GET http://localhost:8080/realms/idphandson/.well-known/uma2-configuration
