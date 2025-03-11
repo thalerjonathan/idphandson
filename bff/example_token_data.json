@@ -1,0 +1,4 @@
+{ header: Header { typ: Some("JWT"), alg: RS256, cty: None, jku: None, jwk: None, kid: Some("42GA3SUktTQ5bnYxJsHO0XPgKKOQ_c-MiwaG8SnVouo"), x5u: None, x5c: None, x5t: None, x5t_s256: None
+    }, claims: IdentityToken { exp: 1741702618, iat: 1741702318, jti: "5978496d-3289-437a-bf3f-b9000df92e63", iss: "http://localhost:8080/realms/idphandson", aud: "idphandson", sub: "9faa3bd5-06b5-4147-bc0f-445d36dc5446", typ: "ID", azp: "idphandson", sid: "603e0cbd-9035-46fd-a754-f43cae72becb", at_hash: "tuLIRu7EYwKYkDXBv02WTQ", acr: "1", email_verified: true, name: "Alice Test", preferred_username: "alice", given_name: "Alice", family_name: "Test", email: "alice@test.com"
+    }
+}
