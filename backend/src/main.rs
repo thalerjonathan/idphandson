@@ -3,8 +3,7 @@ use axum::http::Method;
 use axum::{Router, routing::get};
 
 use handlers::{handle_admin_only, handle_all_roles};
-use log::info;
-use shared::token::get_discovery_document;
+use shared::token::TokenManager;
 
 use std::sync::Arc;
 
@@ -15,19 +14,20 @@ mod handlers;
 async fn main() {
     env_logger::init();
 
+    // TODO: load from env
     let backend_host = "localhost:2345";
 
     let idp_host = "localhost:8080";
     let idp_realm = "idphandson";
 
-    let idp_disc_doc = get_discovery_document(idp_host, idp_realm).await.unwrap();
+    let client_id = "idphandson";
+    let client_secret = "YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK";
 
-    info!(
-        "Successfully queried discovery document from Idp: {:?}",
-        idp_disc_doc
-    );
+    let token_manager = TokenManager::new(idp_host, idp_realm, client_id, client_secret)
+        .await
+        .unwrap();
 
-    let app_state: AppState = AppState { idp_disc_doc };
+    let app_state: AppState = AppState { token_manager };
     let state_arc = Arc::new(app_state);
 
     let cors = tower_http::cors::CorsLayer::new()

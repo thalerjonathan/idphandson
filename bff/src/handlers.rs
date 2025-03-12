@@ -1,16 +1,15 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
-use axum::{Json, extract::State, http::HeaderMap};
+use axum::{Extension, Json, extract::State, http::HeaderMap};
 use log::{info, warn};
 use reqwest::Url;
 use shared::{
     app_error::AppError,
     bff_rest_dtos::LoginDTO,
-    token::{IdpDiscoveryDocument, Tokens, refresh_tokens, request_idp_tokens},
+    token::{TokenManager, Tokens},
 };
 
 use crate::app_state::AppState;
@@ -21,18 +20,11 @@ pub async fn handle_login(
 ) -> Result<String, AppError> {
     info!("handle_login: {:?}", login_info);
 
-    let client_id = "idphandson";
-    let client_secret = "YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK";
-
-    let idp_token = request_idp_tokens(
-        &state.idp_disc_doc,
-        client_id,
-        client_secret,
-        &login_info.username,
-        &login_info.password,
-    )
-    .await
-    .map_err(|e| AppError::from_error(&e.to_string()))?;
+    let idp_token = state
+        .token_manager
+        .request_idp_tokens(&login_info.username, &login_info.password)
+        .await
+        .map_err(|e| AppError::from_error(&e.to_string()))?;
 
     info!("idp_token: {:?}", idp_token);
 
@@ -53,14 +45,13 @@ pub async fn handle_login(
 
 pub async fn handle_admin_only(
     State(state): State<Arc<AppState>>,
+    Extension(backend_host): Extension<String>,
     headers: HeaderMap,
 ) -> Result<String, AppError> {
     info!("handle_admin_only");
 
     let roles: Vec<&str> = vec!["admin"];
-    let tokens = check_loggedin(&headers, &state.idp_disc_doc, &state.token_cache, &roles).await?;
-
-    let backend_host = "localhost:2345";
+    let tokens = check_loggedin(&headers, &state.token_manager, &state.token_cache, &roles).await?;
 
     let url = Url::parse(&format!(
         "http://{}/idphandson/backend/adminonly",
@@ -88,6 +79,7 @@ pub async fn handle_admin_only(
 
 pub async fn handle_all_roles(
     State(state): State<Arc<AppState>>,
+    Extension(backend_host): Extension<String>,
     headers: HeaderMap,
 ) -> Result<String, AppError> {
     info!("handle_all_roles");
@@ -95,13 +87,11 @@ pub async fn handle_all_roles(
     let roles_allowed: Vec<&str> = vec!["admin", "sachbearbeiter"];
     let tokens = check_loggedin(
         &headers,
-        &state.idp_disc_doc,
+        &state.token_manager,
         &state.token_cache,
         &roles_allowed,
     )
     .await?;
-
-    let backend_host = "localhost:2345";
 
     let url = Url::parse(&format!(
         "http://{}/idphandson/backend/allroles",
@@ -129,7 +119,7 @@ pub async fn handle_all_roles(
 
 async fn check_loggedin(
     headers: &HeaderMap,
-    idp_disc_doc: &IdpDiscoveryDocument,
+    token_manager: &TokenManager,
     token_cache: &Mutex<HashMap<String, Tokens>>,
     roles_allowed: &Vec<&str>,
 ) -> Result<Tokens, AppError> {
@@ -151,7 +141,7 @@ async fn check_loggedin(
             .clone()
     };
 
-    let refreshed_tokens = check_roles(idp_disc_doc, &tokens, roles_allowed).await?;
+    let refreshed_tokens = check_roles(token_manager, &tokens, roles_allowed).await?;
 
     {
         let mut lock = token_cache.lock().unwrap();
@@ -167,30 +157,26 @@ async fn check_loggedin(
 }
 
 async fn check_roles(
-    idp_disc_doc: &IdpDiscoveryDocument,
+    token_manager: &TokenManager,
     init_tokens: &Tokens,
     roles_allowed: &Vec<&str>,
 ) -> Result<Tokens, AppError> {
-    let now = SystemTime::now();
-    let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-    let now_secs = since_the_epoch.as_secs();
-
-    let access_token_sec_left: i128 = init_tokens.access.exp as i128 - now_secs as i128;
+    let access_token_sec_left = init_tokens.access.seconds_until_expiration();
 
     info!(
         "Checking Roles for Access Token which expires in {} secs",
         access_token_sec_left
     );
 
-    let tokens = if access_token_sec_left < 0 {
-        let refresh_token_sec_left: i128 = init_tokens.refresh.exp as i128 - now_secs as i128;
+    let tokens = if init_tokens.access.is_expired() {
+        let refresh_token_sec_left: i128 = init_tokens.refresh.seconds_until_expiration();
 
         info!(
             "Access Token expired - requesting new token using refresh token which expires in {} secs",
             refresh_token_sec_left
         );
 
-        if refresh_token_sec_left < 0 {
+        if init_tokens.refresh.is_expired() {
             warn!("Refresh Token expired - User needs to re-login");
 
             return Err(AppError::from_error_unauthorized(
@@ -198,26 +184,18 @@ async fn check_roles(
             ));
         }
 
-        // TODO: build a "Token handler" object that encapsulates things like client id, client secret
-        let client_id = "idphandson";
-        let client_secret = "YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK";
-
-        let new_idp_token = refresh_tokens(
-            idp_disc_doc,
-            client_id,
-            client_secret,
-            &init_tokens.idp.refresh_token,
-        )
-        .await
-        .map_err(|e| {
-            AppError::from_error(&format!("Failed to refresh token: {}", e.to_string()))
-        })?;
+        let new_idp_token = token_manager
+            .refresh_tokens(&init_tokens.idp.refresh_token)
+            .await
+            .map_err(|e| {
+                AppError::from_error(&format!("Failed to refresh token: {}", e.to_string()))
+            })?;
 
         let new_token: Tokens = new_idp_token
             .try_into()
             .map_err(|e: String| AppError::from_error(e.as_str()))?;
 
-        let new_access_token_sec_left: i128 = new_token.access.exp as i128 - now_secs as i128;
+        let new_access_token_sec_left = new_token.access.seconds_until_expiration();
 
         info!(
             "Successfully requested new Tokens using Refresh Token. New Access Token expires in {} secs",
@@ -231,24 +209,7 @@ async fn check_roles(
         init_tokens.clone()
     };
 
-    let mut role_found = false;
-
-    for role_allowed in roles_allowed {
-        if tokens
-            .access
-            .resource_access
-            .idphandson
-            .roles
-            .iter()
-            .find(|actual_role| actual_role.to_lowercase() == role_allowed.to_lowercase())
-            .is_some()
-        {
-            role_found = true;
-            break;
-        }
-    }
-
-    if false == role_found {
+    if false == tokens.access.satisfies_any_role(roles_allowed) {
         warn!(
             "user {:?} access to resource refused because user roles {:?} did not satisfy allowed roles {:?}",
             tokens.identity.sub, tokens.access.resource_access.idphandson.roles, roles_allowed

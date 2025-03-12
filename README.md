@@ -2,6 +2,8 @@
 
 This repo contains stuff collected while traying to get hands-on experience with topics related to IAM/Idp: Active Directory, OAuth2, SAML, SSO, JWT, OIDC.
 
+## TODOs
+
 1. set up a dockerised Identity Provider (Idp) that is able to connect to the dockerised LDAP: https://www.keycloak.org/getting-started/getting-started-docker
     - Naviagte to http://localhost:8080/admin/ and log in by admin/admin
     - Create a new Realm "idphandson" and switch to it
@@ -22,7 +24,7 @@ This repo contains stuff collected while traying to get hands-on experience with
     - https://www.oauth.com/oauth2-servers/token-introspection-endpoint/
 4. explore SSO
 
-## TODO Identity Provider / IAM / LDAP / AD integration: after Idp <-> REST Server interaction and SSO works 
+### TODO Identity Provider / IAM / LDAP / AD integration: after Idp <-> REST Server interaction and SSO works 
 - set up identity provider (some that does not require some cloud application: LinkedIn or FB)
 - set up a dockerised LDAP with some test users with test roles/OUs: https://github.com/osixia/docker-openldap 
     - Navigate to http://localhost:8081 and log in by Login DN: 'cn=admin,dc=example,dc=com' and Password: 'admin'
@@ -31,4 +33,15 @@ This repo contains stuff collected while traying to get hands-on experience with
     - https://htamahc.medium.com/configuring-keycloak-as-an-identity-provider-in-wso2-identity-server-c5cc124b6d6c
     - https://chakray.com/how-use-keycloak-as-wso2-api-manager-identity-provider/
 
+## Flow
 
+1. Frontend (FE) requests login at BFF via login REST endpoint, using user credentials (username, password). Note that all traffic in this example is NOT using HTTPS but unencrypted HTTP, so in a production environment this needs to be changed to HTTPS to make the transmission of user credentials secure.
+2. BFF contacts Identity Provider (Idp) to fetch a token for the given user credentials.
+3. Idp returns Identity, Refresh and Access token to BFF.
+4. BFF decodes and stores the tokens in its token cache and returns a unique user_id that identifies the user. For now this user_id is the "sub" part of the Identity token, therefore it is provided by the Idp. If necessary, this can be changed to a UUID4 generated in the BFF and used instead, because BFF/Backend are not using the "sub" in any way when interacting with the Idp. The only thing that is required from the user_id is that it is unique across all users, as it is used to store and look up the tokens in the token cache.
+5. BFF returns the user_id to the FE.
+6. FE makes a call to any of the secured (non login) REST endpoints. It adds the user_id in a separate "user_id" header.
+7. BFF extracts the user_id from the "user_id" header and looks up the tokens in the token cache. If there are none found, this means that the user is not logged in and BFF returns 401.
+8. BFF checks if the Authorization token is expired. If the Authorization token is expired, it checks if the Refresh Token is expired. If the Refresh Token is expired it returns 401 indicating that the User needs to re-login. If the Refresh Token is not expired, it refreshes the tokens from the Idp by sending the Refresh Token. Note that we do not use an introspection point at the Idp but simply trust that the token we received from the Idp is correct.
+9. BFF checks if the (potentially refreshed) Access token contains the necessary role.
+TODO

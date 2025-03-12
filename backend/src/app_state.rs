@@ -1,5 +1,5 @@
-use shared::token::IdpDiscoveryDocument;
+use shared::token::TokenManager;
 
 pub struct AppState {
-    pub idp_disc_doc: IdpDiscoveryDocument,
+    pub token_manager: TokenManager,
 }

@@ -1,10 +1,80 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use jsonwebtoken::DecodingKey;
 use log::info;
 use reqwest::Url;
 use serde::Deserialize;
 
+pub struct TokenManager {
+    idp_doc: IdpDiscoveryDocument,
+    client_id: String,
+    client_secret: String,
+}
+
+impl TokenManager {
+    pub async fn new(
+        idp_host: &str,
+        realm: &str,
+        client_id: &str,
+        client_secret: &str,
+    ) -> Result<Self, reqwest::Error> {
+        let idp_doc = get_discovery_document(idp_host, realm).await?;
+
+        info!(
+            "TokenManager successfully queried discovery document from Idp: {:?}",
+            idp_doc
+        );
+
+        Ok(Self {
+            idp_doc,
+            client_id: client_id.to_string(),
+            client_secret: client_secret.to_string(),
+        })
+    }
+
+    pub async fn introspect_access_token(
+        &self,
+        access_token: &str,
+    ) -> Result<AccessToken, reqwest::Error> {
+        introspect_access_token(
+            &self.idp_doc,
+            &self.client_id,
+            &self.client_secret,
+            access_token,
+        )
+        .await
+    }
+
+    pub async fn request_idp_tokens(
+        &self,
+        username: &str,
+        password: &str,
+    ) -> Result<IdpTokens, reqwest::Error> {
+        request_idp_tokens(
+            &self.idp_doc,
+            &self.client_id,
+            &self.client_secret,
+            username,
+            password,
+        )
+        .await
+    }
+
+    pub async fn refresh_tokens(&self, refresh_token: &str) -> Result<IdpTokens, reqwest::Error> {
+        refresh_tokens(
+            &self.idp_doc,
+            &self.client_id,
+            &self.client_secret,
+            refresh_token,
+        )
+        .await
+    }
+}
+
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct IdpDiscoveryDocument {
     // A OAuth2-compliant Token Endpoint that supports the urn:ietf:params:oauth:grant-type:uma-ticket grant type. Through this endpoint, clients can send authorization requests and obtain an RPT with all permissions granted by Keycloak.
@@ -134,6 +204,20 @@ pub struct RefreshToken {
     pub scope: String,
 }
 
+impl RefreshToken {
+    pub fn is_expired(&self) -> bool {
+        self.seconds_until_expiration() <= 0
+    }
+
+    pub fn seconds_until_expiration(&self) -> i128 {
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        let now_secs = since_the_epoch.as_secs();
+
+        self.exp as i128 - now_secs as i128
+    }
+}
+
 /*
 Example Access Token Payload from Keycloak
 
@@ -198,6 +282,37 @@ pub struct AccessToken {
     pub given_name: String,
     pub family_name: String,
     pub email: String,
+}
+
+impl AccessToken {
+    pub fn is_expired(&self) -> bool {
+        self.seconds_until_expiration() <= 0
+    }
+
+    pub fn seconds_until_expiration(&self) -> i128 {
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        let now_secs = since_the_epoch.as_secs();
+
+        self.exp as i128 - now_secs as i128
+    }
+
+    pub fn satisfies_any_role(&self, roles_allowed: &Vec<&str>) -> bool {
+        for role_allowed in roles_allowed {
+            if self
+                .resource_access
+                .idphandson
+                .roles
+                .iter()
+                .find(|actual_role| actual_role.to_lowercase() == role_allowed.to_lowercase())
+                .is_some()
+            {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 impl TryFrom<IdpTokens> for Tokens {
@@ -350,7 +465,7 @@ impl TryFrom<IdpTokens> for Tokens {
     }
 }
 
-pub async fn get_discovery_document(
+async fn get_discovery_document(
     idp_host: &str,
     realm: &str,
 ) -> Result<IdpDiscoveryDocument, reqwest::Error> {
@@ -363,7 +478,7 @@ pub async fn get_discovery_document(
     response.json().await
 }
 
-pub async fn request_idp_tokens(
+async fn request_idp_tokens(
     idp_doc: &IdpDiscoveryDocument,
     client_id: &str,
     client_secret: &str,
@@ -405,7 +520,7 @@ pub async fn request_idp_tokens(
     response.json().await
 }
 
-pub async fn refresh_tokens(
+async fn refresh_tokens(
     idp_doc: &IdpDiscoveryDocument,
     client_id: &str,
     client_secret: &str,
@@ -443,7 +558,7 @@ pub async fn refresh_tokens(
     response.json().await
 }
 
-pub async fn introspect_access_token(
+async fn introspect_access_token(
     idp_doc: &IdpDiscoveryDocument,
     client_id: &str,
     client_secret: &str,

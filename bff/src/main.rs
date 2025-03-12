@@ -1,11 +1,11 @@
 use app_state::AppState;
+use axum::Extension;
 use axum::http::Method;
 use axum::routing::post;
 use axum::{Router, routing::get};
 
 use handlers::{handle_admin_only, handle_all_roles, handle_login};
-use log::info;
-use shared::token::get_discovery_document;
+use shared::token::TokenManager;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -17,21 +17,24 @@ mod handlers;
 async fn main() {
     env_logger::init();
 
+    // TODO: load from env
     let bff_host = "localhost:1234";
 
     let idp_host = "localhost:8080";
     let idp_realm = "idphandson";
 
-    let idp_disc_doc = get_discovery_document(idp_host, idp_realm).await.unwrap();
+    let client_id = "idphandson";
+    let client_secret = "YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK";
 
-    info!(
-        "Successfully queried discovery document from Idp: {:?}",
-        idp_disc_doc
-    );
+    let backend_host: String = "localhost:2345".to_string();
+
+    let token_manager = TokenManager::new(idp_host, idp_realm, client_id, client_secret)
+        .await
+        .unwrap();
 
     let token_cache = Mutex::new(HashMap::new());
     let app_state: AppState = AppState {
-        idp_disc_doc,
+        token_manager,
         token_cache,
     };
     let state_arc = Arc::new(app_state);
@@ -52,6 +55,7 @@ async fn main() {
         .route("/idphandson/bff/allroles", get(handle_all_roles))
         .route("/idphandson/bff/login", post(handle_login))
         .layer(cors)
+        .layer(Extension(backend_host))
         .with_state(state_arc);
 
     let listener = tokio::net::TcpListener::bind(bff_host).await.unwrap();
