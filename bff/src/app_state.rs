@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Mutex};
 
-use crate::token::{IdpDiscoveryDocument, Token};
+use crate::token::{IdpDiscoveryDocument, Tokens};
 
 pub struct AppState {
     pub idp_disc_doc: IdpDiscoveryDocument,
-    pub token_cache: tokio::sync::Mutex<HashMap<String, Token>>,
+    pub token_cache: Mutex<HashMap<String, Tokens>>,
 }

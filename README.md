@@ -4,12 +4,14 @@ This repo contains stuff collected while traying to get hands-on experience with
 
 1. set up a dockerised Identity Provider (Idp) that is able to connect to the dockerised LDAP: https://www.keycloak.org/getting-started/getting-started-docker
     - Naviagte to http://localhost:8080/admin/ and log in by admin/admin
-    - Create a new Realm R and switch to it
-    - Create 2 new Realm Roles RO1, RO2 in the Realm
-    - Create a new Client C in the new Realm. This Client represents the REST Service.
-    - Create 2 new Users U1 and U2 in the new Realm.
-        - Assign RO1 and RO2 to U1
-        - Assign R02 to U2
+    - Create a new Realm "idphandson" and switch to it
+    - Create a new Client "idphandson" in the new Realm. This Client represents the BFF and Backend REST Services.
+        -> set client secret to "YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK"
+    - Create 2 new Client Roles "admin", "sachbearbeiter" in the Client
+    - Create a new User "alice" with password "alice", put some values into email, first and last name otherwise Keycloak reports the user not to be ready to use.
+        - Remove default roles and assign Role "admin" and "sachbearbeiter" to alice
+    - Create a new Users "bob" with password "bob" (dont forget email, first last name)
+        - Remove default roles and assign Role "sachbearbeiter" to bob
     - export/import realm config
 2. set up a small BFF REST service in Rust with 2 REST endpoints. This service acts as BFF for a potential UI. The BFF holds the tokens and forwards them to the Backend REST service for authorization. We are not sending the identity token back to the Backendservice. Also: the BFF does not expose the tokens to the UI, but need to find out how we implement the flow then.
     - Implement a "Login" to fetch the bearer token that is gonna be stored in the BFF

@@ -38,29 +38,29 @@ Example returned from Keycloak
     "scope": "openid profile email"
 }
 */
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 // Returned from IdpDiscoveryDocument.token_endpoint
-pub struct IdpToken {
-    access_token: String,
-    expires_in: u64,
-    refresh_expires_in: u64,
-    refresh_token: String,
-    token_type: String,
-    id_token: String,
-    session_state: String,
-    scope: String,
+pub struct IdpTokens {
+    pub access_token: String,
+    pub expires_in: u64,
+    pub refresh_expires_in: u64,
+    pub refresh_token: String,
+    pub token_type: String,
+    pub id_token: String,
+    pub session_state: String,
+    pub scope: String,
 }
 
-#[derive(Debug)]
-pub struct Token {
-    pub idp: IdpToken,
+#[derive(Debug, Clone)]
+pub struct Tokens {
+    pub idp: IdpTokens,
     pub identity: IdentityToken,
     pub refresh: RefreshToken,
     pub access: AccessToken,
 }
 
 /*
-Example Payload from Keycloak
+Example Identity Token Payload from Keycloak
 
 {
   "exp": 1741692770,
@@ -83,7 +83,7 @@ Example Payload from Keycloak
 }
 */
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct IdentityToken {
     pub exp: u64,
     pub iat: u64,
@@ -105,7 +105,7 @@ pub struct IdentityToken {
 }
 
 /*
-Example Payload from Keycloak
+Example Refresh Token Payload from Keycloak
 
 {
   "exp": 1741694270,
@@ -120,7 +120,7 @@ Example Payload from Keycloak
   "scope": "openid acr profile email web-origins service_account basic roles"
 }
 */
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RefreshToken {
     pub exp: u64,
     pub iat: u64,
@@ -135,35 +135,26 @@ pub struct RefreshToken {
 }
 
 /*
-Example Payload from Keycloak
+Example Access Token Payload from Keycloak
 
 {
-  "exp": 1741692770,
-  "iat": 1741692470,
-  "jti": "9c82a93b-9be0-4fe4-9cc0-c0d0f64ec6dd",
+  "exp": 1741766129,
+  "iat": 1741766124,
+  "jti": "b31cda76-530b-4bd6-8ed2-4966654d3104",
   "iss": "http://localhost:8080/realms/idphandson",
-  "aud": "account",
   "sub": "9faa3bd5-06b5-4147-bc0f-445d36dc5446",
   "typ": "Bearer",
   "azp": "idphandson",
-  "sid": "e0d38576-83b7-46fb-b6f4-1e1a6e48389e",
+  "sid": "9164ece8-d57d-4d61-b2a5-f4f9c957d555",
   "acr": "1",
   "allowed-origins": [
     "http://localhost:1234"
   ],
-  "realm_access": {
-    "roles": [
-      "default-roles-idphandson",
-      "offline_access",
-      "uma_authorization"
-    ]
-  },
   "resource_access": {
-    "account": {
+    "idphandson": {
       "roles": [
-        "manage-account",
-        "manage-account-links",
-        "view-profile"
+        "sachbearbeiter",
+        "admin"
       ]
     }
   },
@@ -176,28 +167,22 @@ Example Payload from Keycloak
   "email": "alice@test.com"
 }
 */
-#[derive(Debug, Deserialize)]
-pub struct RealmAccess {
-    pub roles: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ResourceAccess {
-    pub account: ResourceAccessAccount,
+    pub idphandson: ResourceAccessAccount,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ResourceAccessAccount {
     pub roles: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AccessToken {
     pub exp: u64,
     pub iat: u64,
     pub jti: String,
     pub iss: String,
-    pub aud: String,
     pub sub: String,
     pub typ: String,
     pub azp: String,
@@ -205,7 +190,6 @@ pub struct AccessToken {
     pub acr: String,
     #[serde(alias = "allowed-origins")]
     pub allowed_origins: Vec<String>,
-    pub realm_access: RealmAccess,
     pub resource_access: ResourceAccess,
     pub scope: String,
     pub email_verified: bool,
@@ -216,10 +200,10 @@ pub struct AccessToken {
     pub email: String,
 }
 
-impl TryFrom<IdpToken> for Token {
+impl TryFrom<IdpTokens> for Tokens {
     type Error = String;
 
-    fn try_from(value: IdpToken) -> Result<Self, Self::Error> {
+    fn try_from(value: IdpTokens) -> Result<Self, Self::Error> {
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.required_spec_claims = HashSet::new();
         validation.validate_aud = false;
@@ -326,23 +310,19 @@ impl TryFrom<IdpToken> for Token {
                 x5t_s256: None
             },
             claims: AccessToken {
-                exp: 1741703383,
-                iat: 1741703083,
-                jti: "3054ea24-d657-4a82-a84a-e079d9030d95",
+                exp: 1741766337,
+                iat: 1741766332,
+                jti: "3ba87a53-0329-4444-8272-4ac792e9c084",
                 iss: "http://localhost:8080/realms/idphandson",
-                aud: "account",
                 sub: "9faa3bd5-06b5-4147-bc0f-445d36dc5446",
                 typ: "Bearer",
                 azp: "idphandson",
-                sid: "3523b63a-0fba-4e07-b914-866f84502b8f",
+                sid: "7d47c1ed-02f8-416f-94a5-fc496f053d0e",
                 acr: "1",
                 allowed_origins: ["http://localhost:1234"],
-                realm_access: RealmAccess {
-                    roles: ["sachbearbeiter", "default-roles-idphandson", "offline_access", "admin", "uma_authorization"]
-                },
                 resource_access: ResourceAccess {
-                    account: ResourceAccessAccount {
-                        roles: ["manage-account", "manage-account-links", "view-profile"]
+                    idphandson: ResourceAccessAccount {
+                        roles: ["sachbearbeiter", "admin"]
                     }
                 },
                 scope: "openid profile email",
@@ -361,7 +341,7 @@ impl TryFrom<IdpToken> for Token {
             )?;
         info!("access_token_result: {:?}", access_token_result);
 
-        Ok(Token {
+        Ok(Tokens {
             idp: value,
             identity: identity_token_result.claims,
             refresh: refresh_token_result.claims,
@@ -383,13 +363,13 @@ pub async fn get_discovery_document(
     response.json().await
 }
 
-pub async fn post_idp_token(
+pub async fn request_idp_tokens(
     idp_doc: &IdpDiscoveryDocument,
     client_id: &str,
     client_secret: &str,
     username: &str,
     password: &str,
-) -> Result<IdpToken, reqwest::Error> {
+) -> Result<IdpTokens, reqwest::Error> {
     /*
     curl -X POST "http://localhost:8080/realms/idphandson/protocol/openid-connect/token" \
      -H "Content-Type: application/x-www-form-urlencoded" \
@@ -402,7 +382,7 @@ pub async fn post_idp_token(
      */
     let url = Url::parse(&idp_doc.token_endpoint);
 
-    info!("url: {:?}", url);
+    info!("request_idp_token url: {:?}", url);
 
     // Prepare the form data
     let mut params = HashMap::new();
@@ -420,7 +400,45 @@ pub async fn post_idp_token(
         .send()
         .await?;
 
-    info!("response: {:?}", response);
+    info!("request_idp_token response: {:?}", response);
+
+    response.json().await
+}
+
+pub async fn refresh_tokens(
+    idp_doc: &IdpDiscoveryDocument,
+    client_id: &str,
+    client_secret: &str,
+    refresh_token: &str,
+) -> Result<IdpTokens, reqwest::Error> {
+    /*
+    curl -X POST "http://localhost:8080/realms/idphandson/protocol/openid-connect/token" \
+         -H "Content-Type: application/x-www-form-urlencoded" \
+         -d "client_id=idphandson" \
+         -d "client_secret=YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK" \
+         -d "grant_type=refresh_token" \
+         -d "refresh_token=REFRESH_TOKEN"
+    */
+    let url = Url::parse(&idp_doc.token_endpoint);
+
+    info!("refresh_token url: {:?}", url);
+
+    // Prepare the form data
+    let mut params = HashMap::new();
+    params.insert("client_id", client_id);
+    params.insert("client_secret", client_secret);
+    params.insert("grant_type", "refresh_token");
+    params.insert("refresh_token", refresh_token);
+    params.insert("scope", "openid");
+
+    let response = reqwest::Client::new()
+        .post(url.unwrap())
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .form(&params)
+        .send()
+        .await?;
+
+    info!("refresh_token response: {:?}", response);
 
     response.json().await
 }

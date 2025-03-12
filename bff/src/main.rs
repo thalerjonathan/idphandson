@@ -6,10 +6,9 @@ use axum::{Router, routing::get};
 use handlers::{handle_admin_only, handle_all_roles, handle_login};
 use log::info;
 use token::get_discovery_document;
-use tokio::sync::Mutex;
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 mod app_error;
 mod app_state;
