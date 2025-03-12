@@ -4,6 +4,7 @@ edition = "2024"
 
 members = [
     "bff",
+    "backend",
     "frontend",
     "shared",
 ]

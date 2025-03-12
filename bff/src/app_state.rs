@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Mutex};
 
-use crate::token::{IdpDiscoveryDocument, Tokens};
+use shared::token::{IdpDiscoveryDocument, Tokens};
 
 pub struct AppState {
     pub idp_disc_doc: IdpDiscoveryDocument,

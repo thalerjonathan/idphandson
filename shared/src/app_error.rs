@@ -41,6 +41,10 @@ impl AppError {
         }
     }
 
+    pub fn from_error_unauthorized(error: &str) -> Self {
+        AppError::from_error_with_status(error, StatusCode::UNAUTHORIZED)
+    }
+
     pub fn from_error_with_status(error: &str, status: StatusCode) -> Self {
         Self {
             error: error.to_string(),

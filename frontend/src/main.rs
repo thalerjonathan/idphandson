@@ -10,22 +10,23 @@ async fn main() {
     let username = "alice";
     let password = "alice";
 
-    let login_result = login(bff_host, username, password).await.unwrap();
+    let user_id = login(bff_host, username, password).await.unwrap();
 
-    info!("login_result: {:?}", login_result);
+    info!("login_result: {:?}", user_id);
 }
 
-pub async fn login(bff_host: &str, username: &str, password: &str
-) -> Result<(), reqwest::Error> {
-    let url = Url::parse(&format!(
-        "http://{}/login", bff_host
-    ));
+pub async fn login(
+    bff_host: &str,
+    username: &str,
+    password: &str,
+) -> Result<String, reqwest::Error> {
+    let url = Url::parse(&format!("http://{}/login", bff_host));
 
     info!("url: {:?}", url);
 
     let login_info = LoginDTO {
         username: username.to_string(),
-        password: password.to_string()
+        password: password.to_string(),
     };
 
     let response = reqwest::Client::new()

@@ -1,0 +1,33 @@
+{
+    "exp": 1741774589,
+    "iat": 1741774289,
+    "jti": "b3fb4f31-f673-4196-a1bb-6e3e8e72c33b",
+    "iss": "http://localhost:8080/realms/idphandson",
+    "sub": "9faa3bd5-06b5-4147-bc0f-445d36dc5446",
+    "typ": "Bearer",
+    "azp": "idphandson",
+    "sid": "318b8b6f-2c8c-4af8-8b4a-c474b17c874d",
+    "acr": "1",
+    "allowed-origins": [
+        "http://localhost:1234"
+    ],
+    "resource_access": {
+        "idphandson": {
+            "roles": [
+                "sachbearbeiter",
+                "admin"
+            ]
+        }
+    },
+    "scope": "openid profile email",
+    "email_verified": true,
+    "name": "Alice Test",
+    "preferred_username": "alice",
+    "given_name": "Alice",
+    "family_name": "Test",
+    "email": "alice@test.com",
+    "client_id": "idphandson",
+    "username": "alice",
+    "token_type": "Bearer",
+    "active": true
+}

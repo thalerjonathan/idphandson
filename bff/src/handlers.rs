@@ -5,21 +5,21 @@ use std::{
 };
 
 use axum::{Json, extract::State, http::HeaderMap};
-use log::{debug, info, warn};
-use reqwest::StatusCode;
-use shared::bff_rest_dtos::LoginDTO;
-
-use crate::{
+use log::{info, warn};
+use reqwest::Url;
+use shared::{
     app_error::AppError,
-    app_state::AppState,
+    bff_rest_dtos::LoginDTO,
     token::{IdpDiscoveryDocument, Tokens, refresh_tokens, request_idp_tokens},
 };
+
+use crate::app_state::AppState;
 
 pub async fn handle_login(
     State(state): State<Arc<AppState>>,
     Json(login_info): Json<LoginDTO>,
 ) -> Result<String, AppError> {
-    debug!("handle_login: {:?}", login_info);
+    info!("handle_login: {:?}", login_info);
 
     let client_id = "idphandson";
     let client_secret = "YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK";
@@ -58,7 +58,30 @@ pub async fn handle_admin_only(
     info!("handle_admin_only");
 
     let roles: Vec<&str> = vec!["admin"];
-    check_loggedin(&headers, &state.idp_disc_doc, &state.token_cache, &roles).await?;
+    let tokens = check_loggedin(&headers, &state.idp_disc_doc, &state.token_cache, &roles).await?;
+
+    let backend_host = "localhost:2345";
+
+    let url = Url::parse(&format!(
+        "http://{}/idphandson/backend/adminonly",
+        backend_host
+    ));
+
+    let authorization_header = format!("Bearer {}", tokens.idp.access_token);
+
+    let response = reqwest::Client::new()
+        .get(url.unwrap())
+        .header("Authorization", authorization_header)
+        .send()
+        .await
+        .map_err(|e| AppError::from_error(&e.to_string()))?;
+
+    let reply_text = response
+        .text()
+        .await
+        .map_err(|e| AppError::from_error(&e.to_string()))?;
+
+    info!("reply_text: {}", reply_text);
 
     Ok("handle_admin_only success".to_string())
 }
@@ -67,16 +90,39 @@ pub async fn handle_all_roles(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<String, AppError> {
-    debug!("handle_all_roles");
+    info!("handle_all_roles");
 
     let roles_allowed: Vec<&str> = vec!["admin", "sachbearbeiter"];
-    check_loggedin(
+    let tokens = check_loggedin(
         &headers,
         &state.idp_disc_doc,
         &state.token_cache,
         &roles_allowed,
     )
     .await?;
+
+    let backend_host = "localhost:2345";
+
+    let url = Url::parse(&format!(
+        "http://{}/idphandson/backend/allroles",
+        backend_host
+    ));
+
+    let authorization_header = format!("Bearer {}", tokens.idp.access_token);
+
+    let response = reqwest::Client::new()
+        .get(url.unwrap())
+        .header("Authorization", authorization_header)
+        .send()
+        .await
+        .map_err(|e| AppError::from_error(&e.to_string()))?;
+
+    let reply_text = response
+        .text()
+        .await
+        .map_err(|e| AppError::from_error(&e.to_string()))?;
+
+    info!("reply_text: {}", reply_text);
 
     Ok("handle_all_roles success".to_string())
 }
@@ -86,10 +132,10 @@ async fn check_loggedin(
     idp_disc_doc: &IdpDiscoveryDocument,
     token_cache: &Mutex<HashMap<String, Tokens>>,
     roles_allowed: &Vec<&str>,
-) -> Result<(), AppError> {
+) -> Result<Tokens, AppError> {
     let user_id_header = headers
         .get("user_id")
-        .ok_or(AppError::from_error("Missing user_id header"))?;
+        .ok_or(AppError::from_error_unauthorized("Missing user_id header"))?;
     let user_id = user_id_header
         .to_str()
         .map_err(|e| AppError::from_error(&e.to_string()))?;
@@ -101,7 +147,7 @@ async fn check_loggedin(
 
         token_cache
             .get(user_id)
-            .ok_or(AppError::from_error("User not logged in!"))?
+            .ok_or(AppError::from_error_unauthorized("User not logged in!"))?
             .clone()
     };
 
@@ -114,10 +160,10 @@ async fn check_loggedin(
         // checking roles also checks for expiration of access token, and does a refresh of the tokens,
         // therefore returning a potentially new token - if it hasn't change it returns the initial token
         // and this insert simply overrides it in the cache
-        token_cache.insert(user_id.to_string(), refreshed_tokens);
+        token_cache.insert(user_id.to_string(), refreshed_tokens.clone());
     }
 
-    Ok(())
+    Ok(refreshed_tokens)
 }
 
 async fn check_roles(
@@ -147,9 +193,8 @@ async fn check_roles(
         if refresh_token_sec_left < 0 {
             warn!("Refresh Token expired - User needs to re-login");
 
-            return Err(AppError::from_error_with_status(
+            return Err(AppError::from_error_unauthorized(
                 "Refresh Token expired - User needs to re-login",
-                StatusCode::UNAUTHORIZED,
             ));
         }
 
@@ -209,10 +254,7 @@ async fn check_roles(
             tokens.identity.sub, tokens.access.resource_access.idphandson.roles, roles_allowed
         );
 
-        return Err(AppError::from_error_with_status(
-            "Access not allowed",
-            StatusCode::UNAUTHORIZED,
-        ));
+        return Err(AppError::from_error_unauthorized("Missing role"));
     }
 
     Ok(tokens)

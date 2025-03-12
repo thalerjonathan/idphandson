@@ -1,14 +1,12 @@
 use app_state::AppState;
 use axum::http::Method;
-use axum::routing::post;
 use axum::{Router, routing::get};
 
-use handlers::{handle_admin_only, handle_all_roles, handle_login};
+use handlers::{handle_admin_only, handle_all_roles};
 use log::info;
 use shared::token::get_discovery_document;
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 mod app_state;
 mod handlers;
@@ -17,7 +15,7 @@ mod handlers;
 async fn main() {
     env_logger::init();
 
-    let bff_host = "localhost:1234";
+    let backend_host = "localhost:2345";
 
     let idp_host = "localhost:8080";
     let idp_realm = "idphandson";
@@ -29,11 +27,7 @@ async fn main() {
         idp_disc_doc
     );
 
-    let token_cache = Mutex::new(HashMap::new());
-    let app_state: AppState = AppState {
-        idp_disc_doc,
-        token_cache,
-    };
+    let app_state: AppState = AppState { idp_disc_doc };
     let state_arc = Arc::new(app_state);
 
     let cors = tower_http::cors::CorsLayer::new()
@@ -48,13 +42,12 @@ async fn main() {
         .allow_origin(tower_http::cors::Any);
 
     let app = Router::new()
-        .route("/idphandson/bff/adminonly", get(handle_admin_only))
-        .route("/idphandson/bff/allroles", get(handle_all_roles))
-        .route("/idphandson/bff/login", post(handle_login))
+        .route("/idphandson/backend/adminonly", get(handle_admin_only))
+        .route("/idphandson/backend/allroles", get(handle_all_roles))
         .layer(cors)
         .with_state(state_arc);
 
-    let listener = tokio::net::TcpListener::bind(bff_host).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(backend_host).await.unwrap();
 
     axum::serve(listener, app).await.unwrap();
 }

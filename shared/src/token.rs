@@ -442,3 +442,73 @@ pub async fn refresh_tokens(
 
     response.json().await
 }
+
+pub async fn introspect_access_token(
+    idp_doc: &IdpDiscoveryDocument,
+    client_id: &str,
+    client_secret: &str,
+    access_token: &str,
+) -> Result<AccessToken, reqwest::Error> {
+    /*
+    curl -X POST "http://localhost:8080/realms/idphandson/protocol/openid-connect/token/introspect" \
+         -H "Content-Type: application/x-www-form-urlencoded" \
+         -d "client_id=idphandson" \
+         -d "client_secret=YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK" \
+         -d "token=ACCESS_TOKEN"
+        */
+    let url = Url::parse(&idp_doc.introspection_endpoint);
+
+    info!("introspection url: {:?}", url);
+
+    // Prepare the form data
+    let mut params = HashMap::new();
+    params.insert("client_id", client_id);
+    params.insert("client_secret", client_secret);
+    params.insert("token", access_token);
+
+    /* Example Response
+        {
+        "exp": 1741774589,
+        "iat": 1741774289,
+        "jti": "b3fb4f31-f673-4196-a1bb-6e3e8e72c33b",
+        "iss": "http://localhost:8080/realms/idphandson",
+        "sub": "9faa3bd5-06b5-4147-bc0f-445d36dc5446",
+        "typ": "Bearer",
+        "azp": "idphandson",
+        "sid": "318b8b6f-2c8c-4af8-8b4a-c474b17c874d",
+        "acr": "1",
+        "allowed-origins": [
+            "http://localhost:1234"
+        ],
+        "resource_access": {
+            "idphandson": {
+                "roles": [
+                    "sachbearbeiter",
+                    "admin"
+                ]
+            }
+        },
+        "scope": "openid profile email",
+        "email_verified": true,
+        "name": "Alice Test",
+        "preferred_username": "alice",
+        "given_name": "Alice",
+        "family_name": "Test",
+        "email": "alice@test.com",
+        "client_id": "idphandson",
+        "username": "alice",
+        "token_type": "Bearer",
+        "active": true
+    }
+    */
+    let response = reqwest::Client::new()
+        .post(url.unwrap())
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .form(&params)
+        .send()
+        .await?;
+
+    info!("introspection response: {:?}", response);
+
+    response.json().await
+}
