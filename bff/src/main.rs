@@ -53,9 +53,9 @@ async fn main() {
         .allow_origin(tower_http::cors::Any);
 
     let app = Router::new()
-        .route("/idphandson/bff/adminonly", get(handle_admin_only))
-        .route("/idphandson/bff/allroles", get(handle_all_roles))
-        .route("/idphandson/bff/login", post(handle_login))
+        .route("/idphandson/bff/rest/adminonly", get(handle_admin_only))
+        .route("/idphandson/bff/rest/allroles", get(handle_all_roles))
+        .route("/idphandson/bff/rest/login", post(handle_login))
         .route("/idphandson/bff/testpage", get(handle_testpage))
         .route("/idphandson/bff/authfromidp", get(handle_authfromidp))
         .layer(cors)

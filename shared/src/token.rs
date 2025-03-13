@@ -563,6 +563,11 @@ async fn request_idp_tokens_via_code(
     params.insert("client_id", client_id);
     params.insert("client_secret", client_secret);
     params.insert("grant_type", "authorization_code");
+    // TODO: extract redirect_uri
+    params.insert(
+        "redirect_uri",
+        "http://localhost:1234/idphandson/bff/authfromidp",
+    );
     params.insert("code", code);
     params.insert("scope", "openid");
 
@@ -573,7 +578,9 @@ async fn request_idp_tokens_via_code(
         .send()
         .await?;
 
-    info!("request_idp_tokens_via_code response: {:?}", response);
+    info!("request_idp_tokens_via_code response: {:?}", &response);
+
+    // info!("response content: {:?}", &response.text().await.unwrap());
 
     response.json().await
 }

@@ -24,9 +24,16 @@ A small Backend REST service in Rust with 2 REST endpoints that receives the Acc
 ### Frontend
 A very simple Rust application that plays through a simple scenario with login and calling the 2 REST endpoints, mimicking a Frontend via HTTP REST calls.
 
-## TODO Browser Based "Authorization Code Flow" 
+## Browser Based "Authorization Code Flow" 
 
-https://www.keycloak.org/docs/latest/server_admin/index.html#_oidc-auth-flows-authorization
+see https://www.keycloak.org/docs/latest/server_admin/index.html#_oidc-auth-flows-authorization
+
+1. In Browser navigate to http://localhost:1234/idphandson/bff/testpage?user_id=9faa3bd5-06b5-4147-bc0f-445d36dc5446
+2. BFF checks if token is in cache, if yes, simply show HTML page, rendering username and roles. If token is not in chache, issue a redirect to Idp login page with a callback uri in case login is successful.
+3. Idp processes login and redirects back to BFF 'idphandson/bff/authfromidp' URL.
+4. BFF extracts code query param and requests tokens from Idp and stores them in the token cache
+5. BFF redirects back to the original url (see 1.) and performs the same as in 2. but finds now a token.
+
 
 ## Service-Based Flow
 

@@ -5,6 +5,8 @@ use rand::Rng;
 use reqwest::Url;
 use shared::{bff_rest_dtos::LoginDTO, get_from_env_or_panic};
 
+static USER_ID_HEADER: &str = "Idphandson-User-Id";
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -34,7 +36,7 @@ async fn main() {
 }
 
 async fn login(bff_host: &str, username: &str, password: &str) -> Result<String, reqwest::Error> {
-    let url = Url::parse(&format!("http://{}/idphandson/bff/login", bff_host));
+    let url = Url::parse(&format!("http://{}/idphandson/bff/rest/login", bff_host));
 
     let login_info = LoginDTO {
         username: username.to_string(),
@@ -51,11 +53,14 @@ async fn login(bff_host: &str, username: &str, password: &str) -> Result<String,
 }
 
 async fn admin_only(bff_host: &str, user_id: &str) -> Result<String, reqwest::Error> {
-    let url = Url::parse(&format!("http://{}/idphandson/bff/adminonly", bff_host));
+    let url = Url::parse(&format!(
+        "http://{}/idphandson/bff/rest/adminonly",
+        bff_host
+    ));
 
     let response = reqwest::Client::new()
         .get(url.unwrap())
-        .header("Idphandson-User-Id", user_id)
+        .header(USER_ID_HEADER, user_id)
         .send()
         .await?;
 
@@ -65,11 +70,11 @@ async fn admin_only(bff_host: &str, user_id: &str) -> Result<String, reqwest::Er
 }
 
 async fn all_roles(bff_host: &str, user_id: &str) -> Result<String, reqwest::Error> {
-    let url = Url::parse(&format!("http://{}/idphandson/bff/allroles", bff_host));
+    let url = Url::parse(&format!("http://{}/idphandson/bff/rest/allroles", bff_host));
 
     let response = reqwest::Client::new()
         .get(url.unwrap())
-        .header("Idphandson-User-Id", user_id)
+        .header(USER_ID_HEADER, user_id)
         .send()
         .await?;
 
