@@ -3,9 +3,15 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use axum::{Extension, Json, extract::State, http::HeaderMap};
+use axum::{
+    Extension, Json,
+    extract::{Query, State},
+    http::HeaderMap,
+    response::{Html, IntoResponse, Redirect},
+};
 use log::{info, warn};
 use reqwest::Url;
+use serde::Deserialize;
 use shared::{
     app_error::AppError,
     bff_rest_dtos::LoginDTO,
@@ -13,6 +19,18 @@ use shared::{
 };
 
 use crate::app_state::AppState;
+
+/*
+http://localhost:1234/idphandson/bff/authfromidp?state=af0ifjsldkj&session_state=457c4f86-7efa-457a-8f7b-5f780a4e07ce&iss=http%3A%2F%2Flocalhost%3A8080%2Frealms%2Fidphandson&code=6eaafee7-83b0-4a07-a522-0eee04094779.457c4f86-7efa-457a-8f7b-5f780a4e07ce.0c25b80b-66b4-439d-8681-8766e4b0fafb
+*/
+#[allow(dead_code)]
+#[derive(Deserialize)]
+pub struct AuthFromIdpQueryParams {
+    state: String,
+    session_state: String,
+    iss: String,
+    code: String,
+}
 
 pub async fn handle_login(
     State(state): State<Arc<AppState>>,
@@ -22,7 +40,7 @@ pub async fn handle_login(
 
     let idp_token = state
         .token_manager
-        .request_idp_tokens(&login_info.username, &login_info.password)
+        .request_idp_tokens_via_credentials(&login_info.username, &login_info.password)
         .await
         .map_err(|e| AppError::from_error(&e.to_string()))?;
 
@@ -41,6 +59,83 @@ pub async fn handle_login(
     token_cache.insert(user_id.clone(), tokens);
 
     Ok(user_id)
+}
+
+pub async fn handle_authfromidp(
+    State(state): State<Arc<AppState>>,
+    auth_from_idp_params: Query<AuthFromIdpQueryParams>,
+) -> impl IntoResponse {
+    info!("handle_authfromidp");
+
+    let testpage_html = "<html> \
+    <body> \
+        <header> \
+            <h1>Auth from Idp</h1> \
+        </header> \
+    </body>
+</html>";
+
+    let ret = state
+        .token_manager
+        .request_idp_tokens_via_code(&auth_from_idp_params.code)
+        .await;
+
+    info!("token request result: {:?}", ret);
+
+    Html(testpage_html).into_response()
+}
+
+pub async fn handle_testpage(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    info!("handle_testpage");
+
+    let user_id_header = headers.get("Idphandson-User-Id");
+    match user_id_header {
+        None => {
+            // no user id specified, assume user not logged in - redirect to login via Idp
+            let redirect_url = format!(
+                "{}?response_type=code&scope=openid%20profile%20email&client_id={}&state=af0ifjsldkj&redirect_uri=http://localhost:1234/idphandson/bff/authfromidp",
+                state
+                    .token_manager
+                    .idp_discovery_document()
+                    .authorization_endpoint
+                    .clone(),
+                state.token_manager.client_id()
+            );
+
+            Redirect::to(&redirect_url).into_response()
+        }
+        Some(user_id_header_str) => {
+            let user_id = user_id_header_str.to_str().unwrap();
+
+            let mut lock = state.token_cache.lock().unwrap();
+            let token_cache = &mut *lock;
+
+            let tokens = token_cache.get(user_id).clone();
+            match tokens {
+                None => {
+                    // TODO: no token found for user id, assume user not logged in - redirect to login via Idp
+                    Redirect::to("http://www.google.com").into_response()
+                }
+                Some(_tokens) => {
+                    // TODO: check roles
+
+                    let testpage_html = "<html> \
+                        <body> \
+                            <header> \
+                                <h1>Welcome to Idp Hands-On</h1> \
+                                <p>If user was not logged in, it would have gotten redirected to Idp</p>
+                            </header> \
+                        </body>
+                    </html>";
+
+                    Html(testpage_html).into_response()
+                }
+            }
+        }
+    }
 }
 
 pub async fn handle_admin_only(
@@ -124,7 +219,7 @@ async fn check_loggedin(
     roles_allowed: &Vec<&str>,
 ) -> Result<Tokens, AppError> {
     let user_id_header = headers
-        .get("user_id")
+        .get("Idphandson-User-Id")
         .ok_or(AppError::from_error_unauthorized("Missing user_id header"))?;
     let user_id = user_id_header
         .to_str()

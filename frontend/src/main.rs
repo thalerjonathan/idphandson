@@ -55,7 +55,7 @@ async fn admin_only(bff_host: &str, user_id: &str) -> Result<String, reqwest::Er
 
     let response = reqwest::Client::new()
         .get(url.unwrap())
-        .header("user_id", user_id)
+        .header("Idphandson-User-Id", user_id)
         .send()
         .await?;
 
@@ -69,7 +69,7 @@ async fn all_roles(bff_host: &str, user_id: &str) -> Result<String, reqwest::Err
 
     let response = reqwest::Client::new()
         .get(url.unwrap())
-        .header("user_id", user_id)
+        .header("Idphandson-User-Id", user_id)
         .send()
         .await?;
 

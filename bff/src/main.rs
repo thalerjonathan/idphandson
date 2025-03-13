@@ -4,7 +4,9 @@ use axum::http::Method;
 use axum::routing::post;
 use axum::{Router, routing::get};
 
-use handlers::{handle_admin_only, handle_all_roles, handle_login};
+use handlers::{
+    handle_admin_only, handle_all_roles, handle_authfromidp, handle_login, handle_testpage,
+};
 use shared::get_from_env_or_panic;
 use shared::token::TokenManager;
 
@@ -54,7 +56,8 @@ async fn main() {
         .route("/idphandson/bff/adminonly", get(handle_admin_only))
         .route("/idphandson/bff/allroles", get(handle_all_roles))
         .route("/idphandson/bff/login", post(handle_login))
-        .route("/idphandson/bff/welcome", get(handle_admin_only))
+        .route("/idphandson/bff/testpage", get(handle_testpage))
+        .route("/idphandson/bff/authfromidp", get(handle_authfromidp))
         .layer(cors)
         .layer(Extension(backend_host))
         .with_state(state_arc);

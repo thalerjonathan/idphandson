@@ -35,6 +35,14 @@ impl TokenManager {
         })
     }
 
+    pub fn client_id(&self) -> &String {
+        &self.client_id
+    }
+
+    pub fn idp_discovery_document(&self) -> &IdpDiscoveryDocument {
+        &self.idp_doc
+    }
+
     pub async fn introspect_access_token(
         &self,
         access_token: &str,
@@ -48,12 +56,12 @@ impl TokenManager {
         .await
     }
 
-    pub async fn request_idp_tokens(
+    pub async fn request_idp_tokens_via_credentials(
         &self,
         username: &str,
         password: &str,
     ) -> Result<IdpTokens, reqwest::Error> {
-        request_idp_tokens(
+        request_idp_tokens_via_credentials(
             &self.idp_doc,
             &self.client_id,
             &self.client_secret,
@@ -61,6 +69,13 @@ impl TokenManager {
             password,
         )
         .await
+    }
+
+    pub async fn request_idp_tokens_via_code(
+        &self,
+        code: &str,
+    ) -> Result<IdpTokens, reqwest::Error> {
+        request_idp_tokens_via_code(&self.idp_doc, &self.client_id, &self.client_secret, code).await
     }
 
     pub async fn refresh_tokens(&self, refresh_token: &str) -> Result<IdpTokens, reqwest::Error> {
@@ -75,18 +90,19 @@ impl TokenManager {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct IdpDiscoveryDocument {
     // A OAuth2-compliant Token Endpoint that supports the urn:ietf:params:oauth:grant-type:uma-ticket grant type. Through this endpoint, clients can send authorization requests and obtain an RPT with all permissions granted by Keycloak.
-    token_endpoint: String,
+    pub token_endpoint: String,
     // A OAuth2-compliant Token Introspection Endpoint which clients can use to query the server to determine the active state of an RPT and to determine any other information associated with the token, such as the permissions granted by Keycloak.
-    introspection_endpoint: String,
+    pub introspection_endpoint: String,
     // A UMA-compliant Resource Registration Endpoint which resource servers can use to manage their protected resources and scopes. This endpoint provides operations create, read, update and delete resources and scopes in Keycloak.
-    resource_registration_endpoint: String,
+    pub resource_registration_endpoint: String,
     // A UMA-compliant Permission Endpoint which resource servers can use to manage permission tickets. This endpoint provides operations create, read, update, and delete permission tickets in Keycloak.
-    permission_endpoint: String,
+    pub permission_endpoint: String,
+    // see https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
+    pub authorization_endpoint: String,
 
-    authorization_endpoint: String,
     policy_endpoint: String,
     end_session_endpoint: String,
     jwks_uri: String,
@@ -478,7 +494,7 @@ async fn get_discovery_document(
     response.json().await
 }
 
-async fn request_idp_tokens(
+async fn request_idp_tokens_via_credentials(
     idp_doc: &IdpDiscoveryDocument,
     client_id: &str,
     client_secret: &str,
@@ -497,7 +513,7 @@ async fn request_idp_tokens(
      */
     let url = Url::parse(&idp_doc.token_endpoint);
 
-    info!("request_idp_token url: {:?}", url);
+    info!("request_idp_tokens_via_credentials url: {:?}", url);
 
     // Prepare the form data
     let mut params = HashMap::new();
@@ -515,7 +531,49 @@ async fn request_idp_tokens(
         .send()
         .await?;
 
-    info!("request_idp_token response: {:?}", response);
+    info!(
+        "request_idp_tokens_via_credentials response: {:?}",
+        response
+    );
+
+    response.json().await
+}
+
+async fn request_idp_tokens_via_code(
+    idp_doc: &IdpDiscoveryDocument,
+    client_id: &str,
+    client_secret: &str,
+    code: &str,
+) -> Result<IdpTokens, reqwest::Error> {
+    /*
+    curl -X POST "http://localhost:8080/realms/idphandson/protocol/openid-connect/token" \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "client_id=idphandson" \
+     -d "client_secret=YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK" \
+     -d "grant_type=authorization_code" \
+     -d "code=CODE" \
+     -d "scope=openid"
+     */
+    let url = Url::parse(&idp_doc.token_endpoint);
+
+    info!("request_idp_tokens_via_code url: {:?}", url);
+
+    // Prepare the form data
+    let mut params = HashMap::new();
+    params.insert("client_id", client_id);
+    params.insert("client_secret", client_secret);
+    params.insert("grant_type", "authorization_code");
+    params.insert("code", code);
+    params.insert("scope", "openid");
+
+    let response = reqwest::Client::new()
+        .post(url.unwrap())
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .form(&params)
+        .send()
+        .await?;
+
+    info!("request_idp_tokens_via_code response: {:?}", response);
 
     response.json().await
 }
