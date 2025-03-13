@@ -3,6 +3,7 @@ use axum::http::Method;
 use axum::{Router, routing::get};
 
 use handlers::{handle_admin_only, handle_all_roles};
+use shared::get_from_env_or_panic;
 use shared::token::TokenManager;
 
 use std::sync::Arc;
@@ -14,16 +15,15 @@ mod handlers;
 async fn main() {
     env_logger::init();
 
-    // TODO: load from env
-    let backend_host = "localhost:2345";
+    let idp_host = get_from_env_or_panic("IDP_HOST");
+    let idp_realm = get_from_env_or_panic("IDP_REALM");
 
-    let idp_host = "localhost:8080";
-    let idp_realm = "idphandson";
+    let client_id = get_from_env_or_panic("CLIENT_ID");
+    let client_secret = get_from_env_or_panic("CLIENT_SECRET");
 
-    let client_id = "idphandson";
-    let client_secret = "YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK";
+    let backend_host: String = get_from_env_or_panic("BACKEND_HOST");
 
-    let token_manager = TokenManager::new(idp_host, idp_realm, client_id, client_secret)
+    let token_manager = TokenManager::new(&idp_host, &idp_realm, &client_id, &client_secret)
         .await
         .unwrap();
 

@@ -1,30 +1,40 @@
+use std::{thread, time::Duration};
+
 use log::info;
+use rand::Rng;
 use reqwest::Url;
-use shared::bff_rest_dtos::LoginDTO;
+use shared::{bff_rest_dtos::LoginDTO, get_from_env_or_panic};
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
 
-    // TODO: load from env
-    let bff_host = "localhost:1234/idphandson/bff";
+    let bff_host = get_from_env_or_panic("BFF_HOST");
 
     // NOTE: alice has admin and sachbearbeiter roles, bob only sachbearbeiter
-    let username = "bob";
-    let password = "bob";
+    let username = get_from_env_or_panic("FRONTEND_USERNAME");
+    let password = get_from_env_or_panic("FRONTEND_PASSWORD");
 
-    let user_id = login(bff_host, username, password).await.unwrap();
+    let user_id = login(&bff_host, &username, &password).await.unwrap();
     info!("login_result: {}", user_id);
 
-    let admin_only_result = admin_only(bff_host, &user_id).await.unwrap();
-    info!("admin_only_result: {:?}", admin_only_result);
+    let mut rng = rand::rng();
 
-    let all_roles_result = all_roles(bff_host, &user_id).await.unwrap();
-    info!("all_roles_result: {:?}", all_roles_result);
+    loop {
+        let admin_only_result = admin_only(&bff_host, &user_id).await.unwrap();
+        info!("admin_only_result: {:?}", admin_only_result);
+
+        let all_roles_result = all_roles(&bff_host, &user_id).await.unwrap();
+        info!("all_roles_result: {:?}", all_roles_result);
+
+        let sleep_sec = rng.random_range(1..=5);
+
+        thread::sleep(Duration::from_secs(sleep_sec));
+    }
 }
 
 async fn login(bff_host: &str, username: &str, password: &str) -> Result<String, reqwest::Error> {
-    let url = Url::parse(&format!("http://{}/login", bff_host));
+    let url = Url::parse(&format!("http://{}/idphandson/bff/login", bff_host));
 
     let login_info = LoginDTO {
         username: username.to_string(),
@@ -41,7 +51,7 @@ async fn login(bff_host: &str, username: &str, password: &str) -> Result<String,
 }
 
 async fn admin_only(bff_host: &str, user_id: &str) -> Result<String, reqwest::Error> {
-    let url = Url::parse(&format!("http://{}/adminonly", bff_host));
+    let url = Url::parse(&format!("http://{}/idphandson/bff/adminonly", bff_host));
 
     let response = reqwest::Client::new()
         .get(url.unwrap())
@@ -55,7 +65,7 @@ async fn admin_only(bff_host: &str, user_id: &str) -> Result<String, reqwest::Er
 }
 
 async fn all_roles(bff_host: &str, user_id: &str) -> Result<String, reqwest::Error> {
-    let url = Url::parse(&format!("http://{}/allroles", bff_host));
+    let url = Url::parse(&format!("http://{}/idphandson/bff/allroles", bff_host));
 
     let response = reqwest::Client::new()
         .get(url.unwrap())

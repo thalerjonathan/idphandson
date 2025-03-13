@@ -5,6 +5,7 @@ use axum::routing::post;
 use axum::{Router, routing::get};
 
 use handlers::{handle_admin_only, handle_all_roles, handle_login};
+use shared::get_from_env_or_panic;
 use shared::token::TokenManager;
 
 use std::collections::HashMap;
@@ -17,18 +18,17 @@ mod handlers;
 async fn main() {
     env_logger::init();
 
-    // TODO: load from env
-    let bff_host = "localhost:1234";
+    let bff_host = get_from_env_or_panic("BFF_HOST");
 
-    let idp_host = "localhost:8080";
-    let idp_realm = "idphandson";
+    let idp_host = get_from_env_or_panic("IDP_HOST");
+    let idp_realm = get_from_env_or_panic("IDP_REALM");
 
-    let client_id = "idphandson";
-    let client_secret = "YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK";
+    let client_id = get_from_env_or_panic("CLIENT_ID");
+    let client_secret = get_from_env_or_panic("CLIENT_SECRET");
 
-    let backend_host: String = "localhost:2345".to_string();
+    let backend_host: String = get_from_env_or_panic("BACKEND_HOST");
 
-    let token_manager = TokenManager::new(idp_host, idp_realm, client_id, client_secret)
+    let token_manager = TokenManager::new(&idp_host, &idp_realm, &client_id, &client_secret)
         .await
         .unwrap();
 
@@ -54,6 +54,7 @@ async fn main() {
         .route("/idphandson/bff/adminonly", get(handle_admin_only))
         .route("/idphandson/bff/allroles", get(handle_all_roles))
         .route("/idphandson/bff/login", post(handle_login))
+        .route("/idphandson/bff/welcome", get(handle_admin_only))
         .layer(cors)
         .layer(Extension(backend_host))
         .with_state(state_arc);
