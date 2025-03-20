@@ -36,56 +36,73 @@ pub struct AuthFromIdpQueryParams {
     code: String,
 }
 
+fn auth_redirect_url(tm: &TokenManager) -> String {
+    format!(
+        "{}?response_type=code&scope=openid&client_id={}&redirect_uri=http://localhost:1234/idphandson/bff/authfromidp",
+        tm.idp_discovery_document().authorization_endpoint.clone(),
+        tm.client_id()
+    )
+}
+
 pub async fn handle_page_landing(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     info!("handle_page_landing");
 
     match extract_cookie(&headers, ACCESS_TOKEN_COOKIE_ID) {
         None => {
             info!("No access token cookie found - redirecting to Idp login...");
 
-            let auth_redirect_url = format!(
-                "{}?response_type=code&scope=openid&client_id={}&redirect_uri=http://localhost:1234/idphandson/bff/authfromidp",
-                state
-                    .token_manager
-                    .idp_discovery_document()
-                    .authorization_endpoint
-                    .clone(),
-                state.token_manager.client_id()
-            );
+            let auth_redirect_url = auth_redirect_url(&state.token_manager);
 
             // no token found for user assume user not logged in - redirect to login via Idp
-            Redirect::to(&auth_redirect_url).into_response()
+            Ok(Redirect::to(&auth_redirect_url).into_response())
         }
         Some(access_token_encoded) => {
-            info!("Access token cookie found, decoding and validating...");
+            info!("Access token cookie found");
 
-            // TODO: get pub key from Idp via JWK endpoint and use that to decode
+            info!("Fetching certs...");
+            let idp_certs = state
+                .token_manager
+                .get_certs()
+                .await
+                .map_err(|e| AppError::from_error(&e.to_string()))?;
+            info!("Successfully fetched certs");
+
+            info!("Decoding and validating Access token...");
             let access_token_decoding_result =
-                AccessToken::from_encoded_with_idp_pub_key(&access_token_encoded);
-
-            // TODO: handle ExpiredSignature: happens if session got revoked, then need to redirect
-            // TODO: handle Expired access token, request new one using refresh token and update Http-only header
+                AccessToken::from_encoded_with_idp_certs(&access_token_encoded, &idp_certs);
 
             match access_token_decoding_result {
                 Err(err) => {
-                    info!("Failed to decode/validate Access token: {}", err);
+                    let error_kind = err.into_kind();
+                    match error_kind {
+                        jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                            info!("Access token ExpiredSignature - redirecting to Idp login...");
 
-                    let error_page_html = format!(
-                        "<html> \
-                            <body> \
-                                <header> \
-                                    <h1>Invalid Access</h1> \
-                                    <p>Error: {:?}</p> \
-                                </header> \
-                            </body>
-                        </html>",
-                        err
-                    );
+                            let auth_redirect_url = auth_redirect_url(&state.token_manager);
 
-                    Html(error_page_html).into_response()
+                            Ok(Redirect::to(&auth_redirect_url).into_response())
+                        }
+                        _ => {
+                            info!("Failed to decode/validate Access token: {:?}", error_kind);
+
+                            let error_page_html = format!(
+                                "<html> \
+                                    <body> \
+                                        <header> \
+                                            <h1>Invalid Access</h1> \
+                                            <p>Error: {:?}</p> \
+                                        </header> \
+                                    </body>
+                                </html>",
+                                error_kind
+                            );
+
+                            Ok(Html(error_page_html).into_response())
+                        }
+                    }
                 }
                 Ok(access_token) => {
                     info!("Successfully decoded (and validated) Access token");
@@ -105,7 +122,7 @@ pub async fn handle_page_landing(
                     access_token.name,
                     access_token.resource_access.idphandson.roles);
 
-                    Html(landing_page_html).into_response()
+                    Ok(Html(landing_page_html).into_response())
                 }
             }
         }

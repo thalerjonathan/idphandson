@@ -3,10 +3,13 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use jsonwebtoken::DecodingKey;
+use jsonwebtoken::{
+    DecodingKey,
+    jwk::{AlgorithmParameters, CommonParameters, Jwk, KeyAlgorithm, RSAKeyParameters},
+};
 use log::info;
 use reqwest::Url;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub struct TokenManager {
     idp_doc: IdpDiscoveryDocument,
@@ -87,6 +90,13 @@ impl TokenManager {
         )
         .await
     }
+
+    pub async fn get_certs(&self) -> Result<IdpCerts, reqwest::Error> {
+        let url = Url::parse(&self.idp_doc.jwks_uri);
+        let response = reqwest::Client::new().get(url.unwrap()).send().await?;
+
+        response.json().await
+    }
 }
 
 #[allow(dead_code)]
@@ -102,10 +112,11 @@ pub struct IdpDiscoveryDocument {
     pub permission_endpoint: String,
     // see https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
     pub authorization_endpoint: String,
+    // http://localhost:8080/realms/idphandson/protocol/openid-connect/certs
+    pub jwks_uri: String,
 
     policy_endpoint: String,
     end_session_endpoint: String,
-    jwks_uri: String,
     registration_endpoint: String,
 }
 
@@ -300,6 +311,124 @@ pub struct AccessToken {
     pub email: String,
 }
 
+/*
+Example Certs from Keycloak
+curl -X GET http://localhost:8080/realms/idphandson/protocol/openid-connect/certs
+
+{
+    "keys": [
+        {
+            "kid": "7rzENebgD_2P_8JCHYi-TC94waKkNIBkiwcjM4G2j70",
+            "kty": "RSA",
+            "alg": "RS256",
+            "use": "sig",
+            "x5c": [
+                "MIICozCCAYsCBgGVsnxi5zANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDDAppZHBoYW5kc29uMB4XDTI1MDMyMDA3MzU1MVoXDTM1MDMyMDA3MzczMVowFTETMBEGA1UEAwwKaWRwaGFuZHNvbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALHomLPj53bl+qu98KPa1kh5eyIEKLP1r/oxl/XVCt7rU3p5NinDrNkBL1wo4TVcc5b/DxSwgjNei+N6wTUwPdu622MXQiylxRloUTgcts8p2w2Uiv5uVvYWwUOgkvv61g6y62rp+urXYvMHqqadPWV4NGl+9qWWzt/8FbuMZyts0+VG1+tw6V7ztdgrDzcqgd02boacHGucd2a7q01qyJBjbfpXu+3Lf1JU0JXutuK9QnI3B1HO1GKC+ZyNaEgHQeOBg7lKypGQXB5fKqkEV/5/w4d4QsefiqdoGsJu7dbW0yLGhI3+vxailpTXqyQiFrtgKtIsd2mBXQY1+TgN/F8CAwEAATANBgkqhkiG9w0BAQsFAAOCAQEABaMgfu5THB4UZieQGB1jeyAcQWjGObZo23gIHSAUBDzyk42k3OouyTrvNq0R5cgWfmaOJHO5uaC9R2JGbypBhIgkC5bCumws3iX2G8mXovKIOwt3muGQ40TVXNIWKib9fGJBD8BGg7TmiEFLkOn/g7V97kopQEYmHgj1Uotb2xuqDgl3tXvIdZH2YvqOV/M+tFpG/M073rbgxTwPG8L2MNQQLE2eb1Cf41g/Zb49By7ft8xQtYkn5Y2tksagGMe67OTINPYGeDZmMdVbxRnzNs8K476AiZs7ZToOkFcQADHVn87e8xVOdnWmy37K1b2l5VbxacJzuF51PhYcTSc0Jw=="
+            ],
+            "x5t": "0OEjMWIWxwi9k3qfxUyQFuWCDmo",
+            "x5t#S256": "gN_ATY8MTuTYQPMeYOnKP8ehvdA2NmdA6haMvXZKYmc",
+            "n": "seiYs-PnduX6q73wo9rWSHl7IgQos_Wv-jGX9dUK3utTenk2KcOs2QEvXCjhNVxzlv8PFLCCM16L43rBNTA927rbYxdCLKXFGWhROBy2zynbDZSK_m5W9hbBQ6CS-_rWDrLraun66tdi8weqpp09ZXg0aX72pZbO3_wVu4xnK2zT5UbX63DpXvO12CsPNyqB3TZuhpwca5x3ZrurTWrIkGNt-le77ct_UlTQle624r1CcjcHUc7UYoL5nI1oSAdB44GDuUrKkZBcHl8qqQRX_n_Dh3hCx5-Kp2gawm7t1tbTIsaEjf6_FqKWlNerJCIWu2Aq0ix3aYFdBjX5OA38Xw",
+            "e": "AQAB"
+        },
+        {
+            "kid": "SCtqf1S1EoNOGhK3YHAcwtUo75TPY-R9Y5X3x20vA_E",
+            "kty": "RSA",
+            "alg": "RSA-OAEP",
+            "use": "enc",
+            "x5c": [
+                "MIICozCCAYsCBgGVsnxjfTANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDDAppZHBoYW5kc29uMB4XDTI1MDMyMDA3MzU1MVoXDTM1MDMyMDA3MzczMVowFTETMBEGA1UEAwwKaWRwaGFuZHNvbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAPpGSFBSdMZDvjs7oDz9Xs6yTH3buLH2Asbel64jjum2u3V4gcJaRx3ty6AI0VrIeIvHu2R0eQ3oT9TgTNe6/+oYkuYP230cmZaZzQPKpmuzLlGcrS/NbZjd/IcxYY0VU6dkqCS2rqG09MZfbtAFSccADVwXgVvF3RyLyIQLbh5iejAgt8cKdHyzWxm4oM5tyUE/QeZZl/n5znXAmu0932B07Sg1TAOtX5Ye+KVlcYP6Ftj24roEyKQtf1XCyCME9jTcrkRHkcleofYq0sJ6WzyUY4FD9J/1kKPmh335hI5crUmsZQX1OhIhJnrb8NJufYW0QmQhq0hwjiwuYUcYx1cCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAbvKuQa/Lmj7WPlCRRpAioVHCBOcIt6FSHWEuRqC5i87l0Yii6OnFuk65YwjeS1s22geVS+a3FBpDNkUcnOAmfFTKqPMaAm0Txv9Sw/5ovauSJgYtGAl/JukPYpyKxW3pKjTYj/Thle/NLIvowgdOpJ5KUxUwl3cHbpccE7fIo3aCf9ksoisLj/R3Lu4QSVEqKTCIWaR1pc2Hhpb+MfEupSMhFXKePykq8oBVrirjzRDLOMNq7YfGU0QlaM823Sx0HuBXKgIofX3iEs3OUOPG/rYvcO3lUP9L9Ra42e6hH351PsN7fVoFBKwAXvmMBqJfEOQx6emRQTKOsLHcrZRCrQ=="
+            ],
+            "x5t": "GpNV9-NzGRWpmjzxVZV4d88dolU",
+            "x5t#S256": "ZasIMLkzPwqTg0rbeDMdME09du1Lox5VcxN41Xk7MdY",
+            "n": "-kZIUFJ0xkO-OzugPP1ezrJMfdu4sfYCxt6XriOO6ba7dXiBwlpHHe3LoAjRWsh4i8e7ZHR5DehP1OBM17r_6hiS5g_bfRyZlpnNA8qma7MuUZytL81tmN38hzFhjRVTp2SoJLauobT0xl9u0AVJxwANXBeBW8XdHIvIhAtuHmJ6MCC3xwp0fLNbGbigzm3JQT9B5lmX-fnOdcCa7T3fYHTtKDVMA61flh74pWVxg_oW2PbiugTIpC1_VcLIIwT2NNyuREeRyV6h9irSwnpbPJRjgUP0n_WQo-aHffmEjlytSaxlBfU6EiEmetvw0m59hbRCZCGrSHCOLC5hRxjHVw",
+            "e": "AQAB"
+        }
+    ]
+}
+    */
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IdpCerts {
+    keys: Vec<IdpKey>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum IdpKeyAlg {
+    RS256,
+    #[serde(alias = "RSA-OAEP")]
+    RSAOAEP,
+}
+
+impl Into<KeyAlgorithm> for IdpKeyAlg {
+    fn into(self) -> KeyAlgorithm {
+        match self {
+            IdpKeyAlg::RS256 => KeyAlgorithm::RS256,
+            IdpKeyAlg::RSAOAEP => KeyAlgorithm::RSA_OAEP,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum IdpKeyUse {
+    #[serde(alias = "sig")]
+    Sig,
+    #[serde(alias = "enc")]
+    Enc,
+}
+
+// see https://datatracker.ietf.org/doc/html/rfc7517
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct IdpKey {
+    kid: String,
+    kty: String,
+    alg: IdpKeyAlg,
+    #[serde(alias = "use")]
+    use_type: IdpKeyUse,
+    x5c: Vec<String>,
+    x5t: String,
+    #[serde(alias = "x5t#S256")]
+    x5t_s256: String,
+    n: String,
+    e: String,
+}
+
+impl Into<Jwk> for IdpKey {
+    fn into(self) -> Jwk {
+        let common = CommonParameters {
+            key_id: Some(self.kid.clone()),
+            public_key_use: None,
+            key_operations: None,
+            key_algorithm: Some(self.alg.into()),
+            x509_url: None,
+            x509_chain: Some(self.x5c.iter().map(|c| c.clone()).collect()),
+            x509_sha1_fingerprint: Some(self.x5t.clone()),
+            x509_sha256_fingerprint: Some(self.x5t_s256.clone()),
+        };
+
+        let algorithm = match self.alg {
+            IdpKeyAlg::RS256 => {
+                let kp = RSAKeyParameters {
+                    key_type: jsonwebtoken::jwk::RSAKeyType::RSA,
+                    n: self.n.clone(),
+                    e: self.e.clone(),
+                };
+
+                AlgorithmParameters::RSA(kp)
+            }
+            IdpKeyAlg::RSAOAEP => {
+                let kp = RSAKeyParameters {
+                    key_type: jsonwebtoken::jwk::RSAKeyType::RSA,
+                    n: self.n.clone(),
+                    e: self.e.clone(),
+                };
+
+                AlgorithmParameters::RSA(kp)
+            }
+        };
+
+        Jwk { common, algorithm }
+    }
+}
+
 impl AccessToken {
     pub fn is_expired(&self) -> bool {
         self.seconds_until_expiration() <= 0
@@ -330,15 +459,25 @@ impl AccessToken {
         false
     }
 
-    pub fn from_encoded_with_idp_pub_key(
+    pub fn from_encoded_with_idp_certs(
         encoded: &str,
+        idp_certs: &IdpCerts,
     ) -> Result<Self, jsonwebtoken::errors::Error> {
+        // NOTE: we assume an RS256 algorithm
+
+        // TODO: handle not found
+        let idp_key = idp_certs
+            .keys
+            .iter()
+            .find(|k| k.alg == IdpKeyAlg::RS256)
+            .unwrap();
+        let jwk: Jwk = idp_key.clone().into();
+        // TODO: handle not found
+        let decoding_key = DecodingKey::from_jwk(&jwk).unwrap();
+
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.required_spec_claims = HashSet::new();
         validation.validate_aud = false;
-        validation.insecure_disable_signature_validation();
-        // TODO: use pub key
-        let key = DecodingKey::from_secret(&[]);
 
         /* Example decoded Access Token from Keycloak
         TokenData {
@@ -380,7 +519,7 @@ impl AccessToken {
             }
         }
          */
-        jsonwebtoken::decode::<AccessToken>(&encoded, &key, &validation).map(|t| t.claims)
+        jsonwebtoken::decode::<AccessToken>(&encoded, &decoding_key, &validation).map(|t| t.claims)
     }
 }
 
