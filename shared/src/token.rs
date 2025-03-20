@@ -329,6 +329,116 @@ impl AccessToken {
 
         false
     }
+
+    pub fn from_encoded_with_idp_pub_key(
+        encoded: &str,
+    ) -> Result<Self, jsonwebtoken::errors::Error> {
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.required_spec_claims = HashSet::new();
+        validation.validate_aud = false;
+        validation.insecure_disable_signature_validation();
+        // TODO: use pub key
+        let key = DecodingKey::from_secret(&[]);
+
+        /* Example decoded Access Token from Keycloak
+        TokenData {
+            header: Header {
+                typ: Some("JWT"),
+                alg: RS256,
+                cty: None,
+                jku: None,
+                jwk: None,
+                kid: Some("42GA3SUktTQ5bnYxJsHO0XPgKKOQ_c-MiwaG8SnVouo"),
+                x5u: None,
+                x5c: None,
+                x5t: None,
+                x5t_s256: None
+            },
+            claims: AccessToken {
+                exp: 1741766337,
+                iat: 1741766332,
+                jti: "3ba87a53-0329-4444-8272-4ac792e9c084",
+                iss: "http://localhost:8080/realms/rustddd",
+                sub: "9faa3bd5-06b5-4147-bc0f-445d36dc5446",
+                typ: "Bearer",
+                azp: "rustddd",
+                sid: "7d47c1ed-02f8-416f-94a5-fc496f053d0e",
+                acr: "1",
+                allowed_origins: ["http://localhost:1234"],
+                resource_access: ResourceAccess {
+                    rustddd: ResourceAccessAccount {
+                        roles: ["sachbearbeiter", "admin"]
+                    }
+                },
+                scope: "openid profile email",
+                email_verified: true,
+                name: "Alice Test",
+                preferred_username: "alice",
+                given_name: "Alice",
+                family_name: "Test",
+                email: "alice@test.com"
+            }
+        }
+         */
+        jsonwebtoken::decode::<AccessToken>(&encoded, &key, &validation).map(|t| t.claims)
+    }
+}
+
+impl TryFrom<String> for AccessToken {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.required_spec_claims = HashSet::new();
+        validation.validate_aud = false;
+        validation.insecure_disable_signature_validation();
+        let key = DecodingKey::from_secret(&[]);
+
+        /* Example decoded Access Token from Keycloak
+        TokenData {
+            header: Header {
+                typ: Some("JWT"),
+                alg: RS256,
+                cty: None,
+                jku: None,
+                jwk: None,
+                kid: Some("42GA3SUktTQ5bnYxJsHO0XPgKKOQ_c-MiwaG8SnVouo"),
+                x5u: None,
+                x5c: None,
+                x5t: None,
+                x5t_s256: None
+            },
+            claims: AccessToken {
+                exp: 1741766337,
+                iat: 1741766332,
+                jti: "3ba87a53-0329-4444-8272-4ac792e9c084",
+                iss: "http://localhost:8080/realms/rustddd",
+                sub: "9faa3bd5-06b5-4147-bc0f-445d36dc5446",
+                typ: "Bearer",
+                azp: "rustddd",
+                sid: "7d47c1ed-02f8-416f-94a5-fc496f053d0e",
+                acr: "1",
+                allowed_origins: ["http://localhost:1234"],
+                resource_access: ResourceAccess {
+                    rustddd: ResourceAccessAccount {
+                        roles: ["sachbearbeiter", "admin"]
+                    }
+                },
+                scope: "openid profile email",
+                email_verified: true,
+                name: "Alice Test",
+                preferred_username: "alice",
+                given_name: "Alice",
+                family_name: "Test",
+                email: "alice@test.com"
+            }
+        }
+         */
+        let access_token_result = jsonwebtoken::decode::<AccessToken>(&value, &key, &validation)
+            .map_err(|e| format!("failed to decode access token with error {}", e.to_string()))?;
+
+        Ok(access_token_result.claims)
+    }
 }
 
 impl TryFrom<IdpTokens> for Tokens {
@@ -385,7 +495,7 @@ impl TryFrom<IdpTokens> for Tokens {
                     )
                 },
             )?;
-        info!("identity_token_result: {:?}", identity_token_result);
+        // info!("identity_token_result: {:?}", identity_token_result);
 
         /* Example decoded Refresh Token from Keycloak
         TokenData {
@@ -424,7 +534,7 @@ impl TryFrom<IdpTokens> for Tokens {
                     )
                 },
             )?;
-        info!("refresh_token_result: {:?}", refresh_token_result);
+        // info!("refresh_token_result: {:?}", refresh_token_result);
 
         /* Example decoded Access Token from Keycloak
         TokenData {
@@ -470,7 +580,7 @@ impl TryFrom<IdpTokens> for Tokens {
             jsonwebtoken::decode::<AccessToken>(&value.access_token, &key, &validation).map_err(
                 |e| format!("failed to decode access token with error {}", e.to_string()),
             )?;
-        info!("access_token_result: {:?}", access_token_result);
+        // info!("access_token_result: {:?}", access_token_result);
 
         Ok(Tokens {
             idp: value,
@@ -505,7 +615,7 @@ async fn request_idp_tokens_via_credentials(
     curl -X POST "http://localhost:8080/realms/idphandson/protocol/openid-connect/token" \
      -H "Content-Type: application/x-www-form-urlencoded" \
      -d "client_id=idphandson" \
-     -d "client_secret=YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK" \
+     -d "client_secret=Awn3a59BOFLTpZ9PK7HuRWarMW04mKeW" \
      -d "grant_type=password" \
      -d "username=alice" \
      -d "password=alice" \
@@ -549,7 +659,7 @@ async fn request_idp_tokens_via_code(
     curl -X POST "http://localhost:8080/realms/idphandson/protocol/openid-connect/token" \
      -H "Content-Type: application/x-www-form-urlencoded" \
      -d "client_id=idphandson" \
-     -d "client_secret=YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK" \
+     -d "client_secret=Awn3a59BOFLTpZ9PK7HuRWarMW04mKeW" \
      -d "grant_type=authorization_code" \
      -d "code=CODE" \
      -d "scope=openid"
@@ -595,7 +705,7 @@ async fn refresh_tokens(
     curl -X POST "http://localhost:8080/realms/idphandson/protocol/openid-connect/token" \
          -H "Content-Type: application/x-www-form-urlencoded" \
          -d "client_id=idphandson" \
-         -d "client_secret=YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK" \
+         -d "client_secret=Awn3a59BOFLTpZ9PK7HuRWarMW04mKeW" \
          -d "grant_type=refresh_token" \
          -d "refresh_token=REFRESH_TOKEN"
     */
@@ -633,7 +743,7 @@ async fn introspect_access_token(
     curl -X POST "http://localhost:8080/realms/idphandson/protocol/openid-connect/token/introspect" \
          -H "Content-Type: application/x-www-form-urlencoded" \
          -d "client_id=idphandson" \
-         -d "client_secret=YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK" \
+         -d "client_secret=Awn3a59BOFLTpZ9PK7HuRWarMW04mKeW" \
          -d "token=ACCESS_TOKEN"
         */
     let url = Url::parse(&idp_doc.introspection_endpoint);

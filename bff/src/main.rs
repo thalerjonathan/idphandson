@@ -5,7 +5,8 @@ use axum::routing::post;
 use axum::{Router, routing::get};
 
 use handlers::{
-    handle_admin_only, handle_all_roles, handle_authfromidp, handle_login, handle_testpage,
+    handle_page_landing, handle_redirect_authfromidp, handle_rest_admin_only,
+    handle_rest_all_roles, handle_rest_login,
 };
 use shared::get_from_env_or_panic;
 use shared::token::TokenManager;
@@ -34,10 +35,10 @@ async fn main() {
         .await
         .unwrap();
 
-    let token_cache = Mutex::new(HashMap::new());
+    let rest_token_cache = Mutex::new(HashMap::new());
     let app_state: AppState = AppState {
         token_manager,
-        token_cache,
+        rest_token_cache,
     };
     let state_arc = Arc::new(app_state);
 
@@ -53,11 +54,17 @@ async fn main() {
         .allow_origin(tower_http::cors::Any);
 
     let app = Router::new()
-        .route("/idphandson/bff/rest/adminonly", get(handle_admin_only))
-        .route("/idphandson/bff/rest/allroles", get(handle_all_roles))
-        .route("/idphandson/bff/rest/login", post(handle_login))
-        .route("/idphandson/bff/testpage", get(handle_testpage))
-        .route("/idphandson/bff/authfromidp", get(handle_authfromidp))
+        .route(
+            "/idphandson/bff/rest/adminonly",
+            get(handle_rest_admin_only),
+        )
+        .route("/idphandson/bff/rest/allroles", get(handle_rest_all_roles))
+        .route("/idphandson/bff/rest/login", post(handle_rest_login))
+        .route("/idphandson/bff/landing", get(handle_page_landing))
+        .route(
+            "/idphandson/bff/authfromidp",
+            get(handle_redirect_authfromidp),
+        )
         .layer(cors)
         .layer(Extension(backend_host))
         .with_state(state_arc);

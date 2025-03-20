@@ -10,7 +10,7 @@ We have set up Keycloack as a dockerised Identity Provider (Idp): https://www.ke
 To configure it for the application:
 1. Naviagte to http://localhost:8080/admin/ and log in by admin/admin
 2. Create a new Realm "idphandson" and switch to it
-3. Create a new Client "idphandson" in the new Realm. This Client represents the BFF and Backend REST Services. Set client secret to "YfJSiTcLafsjrEiDFMIz8EZDwxVJiToK"
+3. Create a new Client "idphandson" in the new Realm. This Client represents the BFF and Backend REST Services. Set client secret to "Awn3a59BOFLTpZ9PK7HuRWarMW04mKeW"
 4. Create 2 new Client Roles "admin", "sachbearbeiter" in the Client
 5. Create a new User "alice" with password "alice", put some values into email, first and last name otherwise Keycloak reports the user not to be ready to use. Remove default roles and assign Role "admin" and "sachbearbeiter" to alice
 6. Create a new Users "bob" with password "bob" (dont forget email, first last name). Remove default roles and assign Role "sachbearbeiter" to bob
