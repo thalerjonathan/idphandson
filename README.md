@@ -28,11 +28,13 @@ A very simple Rust application that plays through a simple scenario with login a
 
 see https://www.keycloak.org/docs/latest/server_admin/index.html#_oidc-auth-flows-authorization
 
-1. In Browser navigate to http://localhost:1234/idphandson/bff/testpage?user_id=9faa3bd5-06b5-4147-bc0f-445d36dc5446
-2. BFF checks if token is in cache, if yes, simply show HTML page, rendering username and roles. If token is not in chache, issue a redirect to Idp login page with a callback uri in case login is successful.
-3. Idp processes login and redirects back to BFF 'idphandson/bff/authfromidp' URL.
-4. BFF extracts code query param and requests tokens from Idp and stores them in the token cache
-5. BFF redirects back to the original url (see 1.) and performs the same as in 2. but finds now a token.
+1. In Browser navigate to http://localhost:1234/idphandson/bff/landing
+2. BFF checks if tokens are present in Http-only cookies
+    - If yes, decode and validate token using JWK, that is, the certificates of the Idp. If valid, then simply show HTML page, rendering username and roles. If invalid/expired, proceed with point 3 (redirect, see below).
+3. If tokens are not found in cookies, issue a redirect to Idp login page with a callback uri in case login is successful.
+4. Idp processes login and redirects back to BFF 'idphandson/bff/authfromidp' URL.
+5. BFF extracts code query param and requests tokens from Idpl
+6. BFF redirects back to the original url (see 1.) but now with tokens in Http-only cookies and performs the same as in 2. but finds now a token.
 
 
 ## Service-Based Flow
