@@ -1,0 +1,17 @@
+{
+    "emails": Array [String("teste@teste.com")
+    ],
+    "meta": Object {
+        "created": String("2025-03-31T13:01:45.793176Z"),
+        "lastModified": String("2025-03-31T13:01:45.793176Z"),
+        "location": String("https://localhost:9443/scim2/Users/8886aff9-8cad-4519-a620-daafd3f1b8f4"),
+        "resourceType": String("User")
+    },
+    "name": Object {
+        "familyName": String("test"),
+        "givenName": String("test")
+    },
+    "password": String("lY2~}q)/"),
+    "schemas": Array [],
+    "userName": String("testuser")
+}

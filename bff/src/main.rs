@@ -1,12 +1,16 @@
 use app_state::AppState;
 use axum::Extension;
 use axum::http::Method;
-use axum::routing::post;
+use axum::routing::{delete, post, put};
 use axum::{Router, routing::get};
 
 use handlers::{
     handle_page_landing, handle_redirect_authfromidp, handle_rest_admin_only,
     handle_rest_all_roles, handle_rest_login,
+};
+use handlers_scim::{
+    handle_scim_create_user, handle_scim_delete_user, handle_scim_get_user, handle_scim_list_users,
+    handle_scim_update_full_user,
 };
 use shared::get_from_env_or_panic;
 use shared::token::TokenManager;
@@ -16,6 +20,7 @@ use std::sync::{Arc, Mutex};
 
 mod app_state;
 mod handlers;
+mod handlers_scim;
 
 #[tokio::main]
 async fn main() {
@@ -36,9 +41,12 @@ async fn main() {
         .unwrap();
 
     let rest_token_cache = Mutex::new(HashMap::new());
+    let scim_users = Mutex::new(HashMap::new());
+
     let app_state: AppState = AppState {
         token_manager,
         rest_token_cache,
+        scim_users,
     };
     let state_arc = Arc::new(app_state);
 
@@ -64,6 +72,20 @@ async fn main() {
         .route(
             "/idphandson/bff/authfromidp",
             get(handle_redirect_authfromidp),
+        )
+        .route("/idphandson/scim/v2/Users", get(handle_scim_list_users))
+        .route("/idphandson/scim/v2/Users", post(handle_scim_create_user))
+        .route(
+            "/idphandson/scim/v2/Users/{user_id}",
+            get(handle_scim_get_user),
+        )
+        .route(
+            "/idphandson/scim/v2/Users",
+            put(handle_scim_update_full_user),
+        )
+        .route(
+            "/idphandson/scim/v2/Users/{user_id}",
+            delete(handle_scim_delete_user),
         )
         .layer(cors)
         .layer(Extension(backend_host))

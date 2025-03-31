@@ -1,0 +1,47 @@
+{
+    "totalResults": 2,
+    "startIndex": 1,
+    "itemsPerPage": 2,
+    "schemas": [
+        "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+    ],
+    "Resources": [
+        {
+            "emails": [
+                "alice@test.com"
+            ],
+            "meta": {
+                "created": "2025-03-31T12:50:28.055319Z",
+                "location": "https://localhost:9443/scim2/Users/0d2038a6-de77-4ba9-af3b-30f95b33a58c",
+                "lastModified": "2025-03-31T12:50:28.055319Z",
+                "resourceType": "User"
+            },
+            "roles": [
+                {
+                    "audienceValue": "10084a8d-113f-4211-a0d5-efe36b082211",
+                    "display": "everyone",
+                    "audienceType": "organization",
+                    "value": "a5a9e9ff-c32b-4470-81c5-255cec852a1f",
+                    "$ref": "https://localhost:9443/scim2/v2/Roles/a5a9e9ff-c32b-4470-81c5-255cec852a1f",
+                    "audienceDisplay": "Super"
+                }
+            ],
+            "name": {
+                "givenName": "Alice",
+                "familyName": "test"
+            },
+            "id": "0d2038a6-de77-4ba9-af3b-30f95b33a58c",
+            "userName": "alice"
+        },
+        {
+            "meta": {
+                "location": "https://localhost:9443/scim2/Users/86995f5c-d1d5-4481-ab19-c8d34ac5c88a",
+                "resourceType": "User"
+            },
+            "roles": [
+                {
+                    "audienceValue": "10084a8d-113f-4211-a0d5-efe36b082211",
+                    "display": "admin",
+                    "audienceType": "organization",
+                    "value": "50f3125e-90ca-4275-9f23-6f043ac4359a","* Connection #0 to host localhost left intact
+$ref":"https: //localhost:9443/scim2/v2/Roles/50f3125e-90ca-4275-9f23-6f043ac4359a","audienceDisplay":"Super"},{"audienceValue":"781b9bce-d06c-4aa5-8fcc-3be8a76ca9a3","display":"Administrator","audienceType":"application","value":"2984dbaa-6ae3-4df3-8dfc-17214982d9b0","$ref":"https://localhost:9443/scim2/v2/Roles/2984dbaa-6ae3-4df3-8dfc-17214982d9b0","audienceDisplay":"Console"},{"audienceValue":"10084a8d-113f-4211-a0d5-efe36b082211","display":"everyone","audienceType":"organization","value":"a5a9e9ff-c32b-4470-81c5-255cec852a1f","$ref":"https://localhost:9443/scim2/v2/Roles/a5a9e9ff-c32b-4470-81c5-255cec852a1f","audienceDisplay":"Super"}],"groups":[{"display":"admin","value":"8e46ea8a-51e8-4ccb-a0f1-f15fc1f182aa","$ref":"https://localhost:9443/scim2/Groups/8e46ea8a-51e8-4ccb-a0f1-f15fc1f182aa"}],"id":"86995f5c-d1d5-4481-ab19-c8d34ac5c88a","userName":"admin"}]}

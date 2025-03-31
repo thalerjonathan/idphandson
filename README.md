@@ -1,6 +1,6 @@
 # Idp Hands-On
 
-This repo contains stuff collected while traying to get hands-on experience with topics related to IAM/Idp: Active Directory, OAuth2, SAML, SSO, JWT, OIDC.
+This repo contains stuff collected while traying to get hands-on experience with topics related to IAM/Idp: OAuth2, SAML, SSO, JWT, OIDC, SCIM.
 
 ## Components
 
@@ -51,6 +51,24 @@ see https://www.keycloak.org/docs/latest/server_admin/index.html#_oidc-auth-flow
 10. Backend extracts the Access token from the "Authorization" header, and uses the introspection point of the Idp to validate it. It then checks for the necessary role and if not satisfied returns 401, or 200 otherwise. Note that we do not handle the case where the Access token is expired. Although it is a very rare edge case because the BFF just checked the expiration and its very low probability that in the few milliseconds between the checking in the BFF and the call of the Backend to the introspection point, that the Access token expires - still it is possible. In this case we can deal with it basically only in 1 way: communicate a suitable error code back to the BFF which then goes on to refresh the tokens and re-try the call to the Backend. Note that in this flow implementation, the Backend cannot request a new Token because it simply doesn't hold the Refresh token. Therefore the BFF is in full control and charge of all the tokens, which is much more secure. In this case where we have synchronous calls from the FE through to the BFF down to the Backend, an expiring Access Token either in the BFF or Backend is not really too much trouble, and just needs to be dealt with robustly by refreshing the tokens. However, if we had long-running async operations in the Backend, then we have to deal with them in an entirely different way, bypassing the user access token, and resorting to some kind of either offline tokens or a new service account that gets a separate token just for long running operations.
 11. BFF awaits the response of the Backend and simply returns 200 after success.
 12. Frontend has been waiting synchronously for the response of the BFF and continues the processing once the HTTP REST request returned.
+
+## SCIM 
+
+The BFF implements a REST interface that follows the SCIM specification, for provisioning and managing Users. Note that the users are only kept in an in-memory HashMap and not persistet. Also, the users are NOT used for authentication in the BFF, which uses the actual Access Token from the headers - see above. So this part exists purely to develop an understanding of what the SCIM interface looks like and also how to integrate it with an identity provider.
+
+Keycloak serves as the front-facing Idp to the BFF therefore it can be seen as Identity Broker. It forwards authentication to WSO2, which servces as the back-facing Idp to Kecloak. 
+
+WSO2 should be already running from the docker-compose.yml file. Make really sure it runs in "network_mode: host" so that it can connect to the BFF to provision users.
+
+1. Log in to WSO2 via https://localhost:9443/console admin/admin
+2. follow https://is.docs.wso2.com/en/latest/guides/users/outbound-provisioning/provisioning-levels/org-level/#enable-organization-level-outbound-provisioning
+3. Make sure that the SCIM URL to the BFF is correct: make sure the URL is correct http://localhost:1234/idphandson/scim/v2/Users
+
+NOTE: for some reason WSO2 isn't happy with the returned JSON from the POST /Users endpoint and I couldn't really find out what was the problem, also because WSO2 has terrible error messages. For the SCIM hands-on experiment however this suffices.
+
+NOTE: we override have `provisioning.outbound.scim` config in deployment.toml to disable HTTPS for provisioning, otherwise would run into x509 error.
+
+Conclusion: it was substantially harder to config WSO2 (and its infra) and figure out the JSON format on the receiving end, than the rest.
 
 ## TODOs
 
