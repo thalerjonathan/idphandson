@@ -77,8 +77,16 @@ impl TokenManager {
     pub async fn request_idp_tokens_via_code(
         &self,
         code: &str,
+        original_code_verifier_str: &str,
     ) -> Result<IdpTokens, reqwest::Error> {
-        request_idp_tokens_via_code(&self.idp_doc, &self.client_id, &self.client_secret, code).await
+        request_idp_tokens_via_code(
+            &self.idp_doc,
+            &self.client_id,
+            &self.client_secret,
+            code,
+            original_code_verifier_str,
+        )
+        .await
     }
 
     pub async fn refresh_tokens(&self, refresh_token: &str) -> Result<IdpTokens, reqwest::Error> {
@@ -791,8 +799,9 @@ async fn request_idp_tokens_via_credentials(
 async fn request_idp_tokens_via_code(
     idp_doc: &IdpDiscoveryDocument,
     client_id: &str,
-    client_secret: &str,
+    _client_secret: &str,
     code: &str,
+    original_code_verifier_str: &str,
 ) -> Result<IdpTokens, reqwest::Error> {
     /*
     curl -X POST "http://localhost:8080/realms/idphandson/protocol/openid-connect/token" \
@@ -800,6 +809,7 @@ async fn request_idp_tokens_via_code(
      -d "client_id=idphandson" \
      -d "client_secret=Awn3a59BOFLTpZ9PK7HuRWarMW04mKeW" \
      -d "grant_type=authorization_code" \
+     -d "code_verifier=original_code_verifier"
      -d "code=CODE" \
      -d "scope=openid"
      */
@@ -810,8 +820,9 @@ async fn request_idp_tokens_via_code(
     // Prepare the form data
     let mut params = HashMap::new();
     params.insert("client_id", client_id);
-    params.insert("client_secret", client_secret);
+    // params.insert("client_secret", client_secret);
     params.insert("grant_type", "authorization_code");
+    params.insert("code_verifier", original_code_verifier_str);
     // TODO: extract redirect_uri
     params.insert(
         "redirect_uri",
@@ -827,9 +838,9 @@ async fn request_idp_tokens_via_code(
         .send()
         .await?;
 
-    info!("request_idp_tokens_via_code response: {:?}", &response);
+    info!("request_idp_tokens_via_code response: {:?}", &response,);
 
-    // info!("response content: {:?}", &response.text().await.unwrap());
+    //info!("response content: {:?}", &response.text().await.unwrap());
 
     response.json().await
 }

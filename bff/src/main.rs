@@ -42,11 +42,13 @@ async fn main() {
 
     let rest_token_cache = Mutex::new(HashMap::new());
     let scim_users = Mutex::new(HashMap::new());
+    let code_challenge_cache = Mutex::new(HashMap::new());
 
     let app_state: AppState = AppState {
         token_manager,
         rest_token_cache,
         scim_users,
+        code_challenge_cache,
     };
     let state_arc = Arc::new(app_state);
 

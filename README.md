@@ -14,6 +14,10 @@ To configure it for the application:
 4. Create 2 new Client Roles "admin", "sachbearbeiter" in the Client
 5. Create a new User "alice" with password "alice", put some values into email, first and last name otherwise Keycloak reports the user not to be ready to use. Remove default roles and assign Role "admin" and "sachbearbeiter" to alice
 6. Create a new Users "bob" with password "bob" (dont forget email, first last name). Remove default roles and assign Role "sachbearbeiter" to bob
+7. To enable PKCE: select the Client and under settings:
+    - Ensure Access Type is public (PKCE is mainly for public clients), that is Client Authentication should be OFF
+    - Ensure Standard Flow Enabled is ON (PKCE works with Authorization Code Flow)
+    - Under Advanced Settings → Proof Key for Code Exchange Required → Set to "Code Challenge Required"
 
 ### BFF
 A small BFF REST service in Rust with 2 REST endpoints. This service acts as BFF for the Frontend. The BFF holds the tokens and forwards them to the Backend REST service for authorization. Also, the BFF does not expose the tokens to the Frontend, and only returns a simple user-id for identification.
@@ -36,6 +40,7 @@ see https://www.keycloak.org/docs/latest/server_admin/index.html#_oidc-auth-flow
 5. BFF extracts code query param and requests tokens from Idpl
 6. BFF redirects back to the original url (see 1.) but now with tokens in Http-only cookies and performs the same as in 2. but finds now a token.
 
+NOTE: PKCE (Proof Key for Code Exchange) is implemented, by sending 2 concatenated uuid v4 strings SHA256 Hashed as code_verifier, using a uuid v4 as state to connect the incoming redirect.
 
 ## Service-Based Flow
 

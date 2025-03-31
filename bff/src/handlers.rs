@@ -7,16 +7,20 @@ use axum::{
     Extension, Json,
     extract::{Query, State},
     http::{HeaderMap, HeaderValue},
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{Html, IntoResponse, Redirect},
 };
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use log::{info, warn};
 use reqwest::{StatusCode, Url};
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use shared::{
     app_error::AppError,
     bff_rest_dtos::LoginDTO,
     token::{AccessToken, TokenManager, Tokens},
 };
+use uuid::Uuid;
 
 use crate::app_state::AppState;
 
@@ -31,17 +35,49 @@ http://localhost:1234/idphandson/bff/authfromidp?state=af0ifjsldkj&session_state
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct AuthFromIdpQueryParams {
-    session_state: String,
+    // session_state: String,
     iss: String,
     code: String,
+    state: String,
 }
 
-fn auth_redirect_url(tm: &TokenManager) -> String {
+fn auth_redirect_url(tm: &TokenManager, state: &str, code_challenge: &str) -> String {
     format!(
-        "{}?response_type=code&scope=openid&client_id={}&redirect_uri=http://localhost:1234/idphandson/bff/authfromidp",
+        "{}?response_type=code&scope=openid&client_id={}&state={}&code_challenge={}&code_challenge_method=S256&redirect_uri=http://localhost:1234/idphandson/bff/authfromidp",
         tm.idp_discovery_document().authorization_endpoint.clone(),
-        tm.client_id()
+        tm.client_id(),
+        state,
+        code_challenge,
     )
+}
+
+fn generate_and_store_code_verifier(
+    code_challenge_cache: &mut HashMap<String, String>,
+) -> (String, String) {
+    // NOTE:
+    //  code_verifier is a random string, in our case we use 2x a uuid v4 because the code_verifier has to be at least 43 characters
+    //  code_challenge = {BASE64(SHA256(code_verifier))}
+    let code_verifier = format!(
+        "{}{}",
+        Uuid::new_v4().to_string(),
+        Uuid::new_v4().to_string()
+    );
+
+    let mut hasher = Sha256::new();
+    hasher.update(code_verifier.as_bytes());
+    let hashed = hasher.finalize();
+    let code_challenge = URL_SAFE_NO_PAD.encode(hashed);
+
+    // let code_challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD
+    //     .encode(sha256::digest(code_verifier.clone()));
+    // NOTE: we need the state to be able to connect the incoming redirect from idp to the stored code_verifier
+    let state = Uuid::new_v4().to_string();
+    code_challenge_cache.insert(state.clone(), code_verifier.clone());
+
+    info!("state: {:?}", state);
+    info!("code_verifier: {:?}", code_verifier);
+
+    (state, code_challenge)
 }
 
 pub async fn handle_page_landing(
@@ -54,7 +90,15 @@ pub async fn handle_page_landing(
         None => {
             info!("No access token cookie found - redirecting to Idp login...");
 
-            let auth_redirect_url = auth_redirect_url(&state.token_manager);
+            let mut lock = state.code_challenge_cache.lock().unwrap();
+            let code_challenge_cache = &mut *lock;
+            let (state_str, code_challenge) =
+                generate_and_store_code_verifier(code_challenge_cache);
+
+            let auth_redirect_url =
+                auth_redirect_url(&state.token_manager, &state_str, &code_challenge);
+
+            info!("Redirect to {}", auth_redirect_url);
 
             // no token found for user assume user not logged in - redirect to login via Idp
             Ok(Redirect::to(&auth_redirect_url).into_response())
@@ -81,7 +125,18 @@ pub async fn handle_page_landing(
                         jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
                             info!("Access token ExpiredSignature - redirecting to Idp login...");
 
-                            let auth_redirect_url = auth_redirect_url(&state.token_manager);
+                            let mut lock = state.code_challenge_cache.lock().unwrap();
+                            let code_challenge_cache = &mut *lock;
+                            let (state_str, code_challenge) =
+                                generate_and_store_code_verifier(code_challenge_cache);
+
+                            let auth_redirect_url = auth_redirect_url(
+                                &state.token_manager,
+                                &state_str,
+                                &code_challenge,
+                            );
+
+                            info!("Redirect to {}", auth_redirect_url);
 
                             Ok(Redirect::to(&auth_redirect_url).into_response())
                         }
@@ -132,12 +187,26 @@ pub async fn handle_page_landing(
 pub async fn handle_redirect_authfromidp(
     State(state): State<Arc<AppState>>,
     auth_from_idp_params: Query<AuthFromIdpQueryParams>,
-) -> Result<Response, AppError> {
+) -> Result<impl IntoResponse, AppError> {
     info!("handle_redirect_authfromidp {:?}", auth_from_idp_params);
+
+    let original_code_verifier = {
+        let mut lock = state.code_challenge_cache.lock().unwrap();
+        let code_challenge_cache = &mut *lock;
+        let original_code_verifier = code_challenge_cache
+            .get(&auth_from_idp_params.state)
+            .ok_or("State not found!")
+            .map_err(|e| AppError::from_error_unauthorized(&e.to_string()))?
+            .clone();
+        code_challenge_cache.remove(&auth_from_idp_params.state);
+        original_code_verifier
+    };
+
+    info!("original_code_verifier {:?}", original_code_verifier);
 
     let idp_tokens = state
         .token_manager
-        .request_idp_tokens_via_code(&auth_from_idp_params.code)
+        .request_idp_tokens_via_code(&auth_from_idp_params.code, &original_code_verifier)
         .await
         .map_err(|e| AppError::from_error(&e.to_string()))?;
 
